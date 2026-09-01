@@ -63,6 +63,10 @@ export default function ReportIncidentPage() {
     setError(null);
     setFieldErrors({});
 
+    const cleanTitle = title.trim();
+    const cleanDesc = description.trim();
+    const cleanAddress = address.trim();
+
     const lat = Number(latitude);
     const lng = Number(longitude);
 
@@ -71,47 +75,53 @@ export default function ReportIncidentPage() {
       errors[field] = [...(errors[field] ?? []), message];
     };
 
-    if (title.trim().length < 3) {
-      addError('title', 'Title must be at least 3 characters long.');
+    if (cleanTitle.length < 3) {
+      addError('title', 'Title must be at least 3 characters long (cannot be whitespace-only).');
     }
-    if (title.trim().length > 120) {
+    if (cleanTitle.length > 120) {
       addError('title', 'Title must be at most 120 characters long.');
     }
-    if (description.trim().length < 10) {
-      addError('description', 'Description must be at least 10 characters long.');
+
+    if (cleanDesc.length < 10) {
+      addError('description', 'Description must be at least 10 characters long (cannot be whitespace-only).');
     }
-    if (description.trim().length > 2000) {
+    if (cleanDesc.length > 2000) {
       addError('description', 'Description must be at most 2000 characters long.');
     }
-    if (latitude === '') addError('location', 'Latitude is required (click Detect Location).');
-    if (longitude === '') addError('location', 'Longitude is required (click Detect Location).');
+
+    if (cleanTitle.toLowerCase() === cleanDesc.toLowerCase() && cleanTitle.length > 0) {
+      addError('description', 'Title and description cannot be identical.');
+    }
+
+    if (latitude === '') addError('location', 'Latitude is required (click Detect My Location).');
+    if (longitude === '') addError('location', 'Longitude is required (click Detect My Location).');
     if (latitude !== '' && (Number.isNaN(lat) || lat < -90 || lat > 90)) {
       addError('location', 'Latitude must be between -90 and 90.');
     }
     if (longitude !== '' && (Number.isNaN(lng) || lng < -180 || lng > 180)) {
       addError('location', 'Longitude must be between -180 and 180.');
     }
-    if (address.trim().length > 300) {
+    if (cleanAddress.length > 300) {
       addError('location', 'Address must be at most 300 characters long.');
     }
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      setError('Please correct the highlighted fields.');
+      setError('Please correct the highlighted validation errors.');
       return;
     }
 
     setIsSubmitting(true);
     try {
       await createIncident({
-        title: title.trim(),
-        description: description.trim(),
+        title: cleanTitle,
+        description: cleanDesc,
         category,
         severity,
         location: {
           latitude: lat,
           longitude: lng,
-          address: address.trim() || undefined,
+          address: cleanAddress || undefined,
         },
       });
       router.push('/incidents/my');
@@ -139,7 +149,7 @@ export default function ReportIncidentPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Report Incident</h1>
           <p className="text-slate-400 text-sm">
-            Submit an emergency report for authority review
+            Submit an emergency report for authority review & AI priority assessment
           </p>
         </div>
       </div>
@@ -150,7 +160,7 @@ export default function ReportIncidentPage() {
             <ShieldCheck size={14} /> Automated Verification Active
           </span>
           <p className="text-[11px] text-slate-400">
-            Reports are automatically analyzed for text validity. Submissions containing random keyboard mashing (e.g. asdasd) or spam text will be rejected.
+            Reports are verified for text structure. Inputs containing random digits (e.g. 12312 41jk23), keyboard mash, or XSS payloads will be rejected.
           </p>
         </div>
 
@@ -163,41 +173,53 @@ export default function ReportIncidentPage() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label htmlFor="title" className={labelClass}>
-              Title
-            </label>
+            <div className="flex justify-between items-center mb-1.5">
+              <label htmlFor="title" className={labelClass}>
+                Title <span className="text-orange-400">*</span>
+              </label>
+              <span className={`text-[10px] ${title.length > 120 ? 'text-red-400 font-bold' : 'text-slate-500'}`}>
+                {title.length}/120
+              </span>
+            </div>
             <input
               id="title"
               type="text"
               required
+              maxLength={120}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Brief summary of the emergency (e.g. Severe Flash Flood near River Bridge)"
+              placeholder="Brief summary of emergency (e.g. Flash Flood near MG Road)"
               className={inputClass}
             />
+            {fieldErrors.title && <p className="text-xs text-red-400 mt-1">{fieldErrors.title[0]}</p>}
           </div>
-          {fieldErrors.title && <p className="text-xs text-red-400 -mt-3">{fieldErrors.title[0]}</p>}
 
           <div>
-            <label htmlFor="description" className={labelClass}>
-              Description
-            </label>
+            <div className="flex justify-between items-center mb-1.5">
+              <label htmlFor="description" className={labelClass}>
+                Description <span className="text-orange-400">*</span>
+              </label>
+              <span className={`text-[10px] ${description.length > 2000 ? 'text-red-400 font-bold' : 'text-slate-500'}`}>
+                {description.length}/2000
+              </span>
+            </div>
             <textarea
               id="description"
               required
               rows={4}
+              maxLength={2000}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe what happened, who is affected, and any immediate risks…"
+              placeholder="Describe the emergency situation, immediate hazards, trapped individuals, or medical urgency in detail…"
               className={`${inputClass} resize-y min-h-[100px]`}
             />
+            {fieldErrors.description && <p className="text-xs text-red-400 mt-1">{fieldErrors.description[0]}</p>}
           </div>
-          {fieldErrors.description && <p className="text-xs text-red-400 -mt-3">{fieldErrors.description[0]}</p>}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="category" className={labelClass}>
-                Category
+                Category <span className="text-orange-400">*</span>
               </label>
               <select
                 id="category"
@@ -217,7 +239,7 @@ export default function ReportIncidentPage() {
 
             <div>
               <label htmlFor="severity" className={labelClass}>
-                Severity
+                Initial Perceived Priority <span className="text-orange-400">*</span>
               </label>
               <select
                 id="severity"
@@ -238,7 +260,7 @@ export default function ReportIncidentPage() {
             <div className="flex items-center justify-between gap-2 mb-3 mt-4">
               <div className="flex items-center gap-2">
                 <MapPin size={16} className="text-orange-400" />
-                <p className="text-sm font-medium text-slate-200">Location Coordinates</p>
+                <p className="text-sm font-medium text-slate-200">Location Coordinates <span className="text-orange-400">*</span></p>
               </div>
 
               <Button
@@ -263,7 +285,7 @@ export default function ReportIncidentPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label htmlFor="latitude" className={labelClass}>
-                  Latitude
+                  Latitude <span className="text-orange-400">*</span>
                 </label>
                 <input
                   id="latitude"
@@ -278,7 +300,7 @@ export default function ReportIncidentPage() {
               </div>
               <div>
                 <label htmlFor="longitude" className={labelClass}>
-                  Longitude
+                  Longitude <span className="text-orange-400">*</span>
                 </label>
                 <input
                   id="longitude"
@@ -294,15 +316,21 @@ export default function ReportIncidentPage() {
             </div>
 
             <div>
-              <label htmlFor="address" className={labelClass}>
-                Landmark / Street Address <span className="text-slate-500 normal-case">(optional)</span>
-              </label>
+              <div className="flex justify-between items-center mb-1.5">
+                <label htmlFor="address" className={labelClass}>
+                  Landmark / Street Address <span className="text-slate-500 normal-case font-normal">(optional)</span>
+                </label>
+                <span className={`text-[10px] ${address.length > 300 ? 'text-red-400 font-bold' : 'text-slate-500'}`}>
+                  {address.length}/300
+                </span>
+              </div>
               <input
                 id="address"
                 type="text"
+                maxLength={300}
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="Nearby landmark or street address"
+                placeholder="Nearby landmark or street address (e.g. Near City Hospital, MG Road & Park Street)"
                 className={inputClass}
               />
             </div>

@@ -8,7 +8,12 @@ export const metadata: Metadata = {
     default: 'DRECS — Disaster Response & Emergency Coordination System',
   },
   description:
-    'A real-time platform connecting citizens, volunteers, and authorities during disaster events.',
+    'A real-time enterprise platform connecting citizens, volunteers, and authorities during disaster events.',
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({
@@ -18,6 +23,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+      </head>
       <body>
         <Providers>{children}</Providers>
       </body>

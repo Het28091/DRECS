@@ -19,7 +19,7 @@ In high-stress disaster scenarios—such as flash floods, severe earthquakes, cy
    - Citizens and field personnel can instantly submit incident reports with automated browser GPS coordinates (`Latitude`/`Longitude`) and landmark addresses, eliminating location ambiguity during emergency rescues.
 
 2. **Automated AI Content Moderation & Spam Shield**
-   - Automatically filters out keyboard-mash spam (e.g. `asdasd`, `qwerty`), repetitive character entropy, and non-emergency test entries before they clutter emergency command queues.
+   - Automatically filters out keyboard-mash spam (e.g. `asdasd`, `qwerty`), random numbers (`12312 41jk23`), mixed character noise, and non-emergency test entries before they clutter emergency command queues.
 
 3. **Lore-Accurate AI Priority Arbitration (UN / FEMA Standard)**
    - Evaluates submitted reports against official disaster severity guidelines (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`).
@@ -36,99 +36,97 @@ In high-stress disaster scenarios—such as flash floods, severe earthquakes, cy
 
 ---
 
-## 🚀 Current Level of Progress & Status
+## 💻 Zero-Friction Setup Guide (Cloning to Another Laptop)
 
-| Module / System Layer | Status | Implementation Details |
-| :--- | :---: | :--- |
-| **Authentication & RBAC** | ✅ Complete | JWT tokens, bcrypt hashing, 5-point password complexity enforcement, role guards (`citizen`, `volunteer`, `authority`, `admin`). |
-| **Incident Reporting & GPS** | ✅ Complete | Dynamic form validation, one-click GPS location detection, image upload support. |
-| **AI Content Moderation** | ✅ Complete | Multi-tiered verification (local pattern engine + OpenAI Free Moderation API + GPT-4o-Mini emergency analyzer). |
-| **AI Priority Arbitration** | ✅ Complete | Lore-accurate UN/FEMA severity evaluation with user vs AI priority arbitration rules. |
-| **Live Interactive GIS Map** | ✅ Complete | Leaflet map with custom severity markers, popup details, and shelter overlays (SSR-safe). |
-| **Shelter & Resource Management** | ✅ Complete | Full CRUD operations, capacity counters, low-stock warnings, allocation tracking. |
-| **Volunteer Task Management** | ✅ Complete | Task request submission, authority approval workflow, assignment tracking. |
-| **Tactical Dark UI Console** | ✅ Complete | High-contrast, zero-glare dark console designed for 24/7 crisis command centers. |
-| **WebSocket Real-time Sync** | ✅ Complete | Socket.IO server emitting live notifications for incident updates and assignments. |
+To run **DRECS** on any fresh machine/laptop, simply follow these steps:
+
+### Step 1: Clone the Repository
+```bash
+git clone https://github.com/Het28091/DRECS.git
+cd DRECS
+```
 
 ---
 
-## 🔮 Post-Completion Expectations & Roadmap
+### Step 2: Configure & Start Backend (`server`)
 
-Future operational enhancements planned for deployment in low-connectivity disaster zones:
+Open a terminal in the root directory:
 
-1. **Progressive Web App (PWA) Offline Synchronization**
-   - Local storage of incident submissions using IndexedDB, automatically syncing with MongoDB when mobile network connectivity is restored.
-2. **Twilio SMS Fallback Gateway**
-   - SMS-based report submission and emergency alerts for citizens in areas without cellular data coverage.
-3. **Computer Vision Damage Assessment**
-   - Integration of multi-modal AI vision models (Gemini 1.5 Vision / GPT-4o Vision) to automatically verify structural damage photos submitted by citizens.
-
----
-
-## 🔒 Security Posture & Production Hardening
-
-- **Enterprise Password Policy:** Enforces 8+ characters, uppercase, lowercase, numeric digits, and special characters.
-- **Fail-Fast Controller Defense:** Rejects invalid/spam requests at the API layer before DB reads or socket broadcasts.
-- **Role-Based Access Control (RBAC):** Strict endpoint protection restricting administrative operations to authorized roles.
-- **Injection & XSS Protection:** Mongoose schema sanitization and structured payload typing.
-
----
-
-## 🛠️ Tech Stack Architecture
-
-- **Frontend:** Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Lucide Icons, Leaflet GIS.
-- **Backend:** Node.js, Express.js, TypeScript, Socket.IO, Mongoose.
-- **Database:** MongoDB Atlas Cloud Cluster.
-- **AI Integration:** OpenAI API (`omni-moderation-latest` & `gpt-4o-mini`).
-
----
-
-## 💻 Local Setup & Execution Guide
-
-### Prerequisites
-- Node.js (v18+)
-- MongoDB Atlas account (or local MongoDB instance)
-- OpenAI API Key (optional for AI moderation)
-
-### 1. Backend Setup
 ```bash
 cd server
 npm install
 ```
 
-Configure `server/.env`:
+Create a `.env` file in the `server/` directory:
 ```env
 PORT=5000
 NODE_ENV=development
-MONGODB_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret_key
+MONGODB_URI=mongodb+srv://hetprajapati:hetprajapati@cluster0.79mz6xp.mongodb.net/drecs?retryWrites=true&w=majority
+JWT_SECRET=drecs_production_jwt_secret_key_2026_secure
 CLIENT_URL=http://localhost:3000
-OPENAI_API_KEY=your_openai_api_key
+OPENAI_API_KEY=your_openai_api_key_here
 ```
+*(Note: If `OPENAI_API_KEY` is left blank, DRECS automatically falls back to its built-in local rule-based verification engine!)*
 
-Run the backend server:
+Run the backend dev server:
 ```bash
 npm run dev
 ```
+*(Server will start on `http://localhost:5000`)*
 
-### 2. Frontend Setup
+---
+
+### Step 3: Configure & Start Frontend (`client`)
+
+Open a second terminal in the root directory:
+
 ```bash
 cd client
 npm install
 ```
 
-Configure `client/.env.local`:
+Create a `.env.local` file in the `client/` directory:
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:5000/api
 NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
 ```
 
-Run the frontend client:
+Run the frontend client dev server:
 ```bash
 npm run dev
 ```
+*(Client will start on `http://localhost:3000`)*
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open **[http://localhost:3000](http://localhost:3000)** in your browser!
+
+---
+
+## 🔒 Comprehensive Validation & Security Posture
+
+DRECS enforces strict, multi-layered security validation across all forms:
+
+* **Title Field:** Min 3, Max 120 chars. Whitespace-only inputs rejected. Sanitized against XSS (`<script>`, `<img onerror>`), SQL Injection, and HTML tags.
+* **Description Field:** Min 10, Max 2000 chars. Whitespace-only inputs rejected. Preserves line breaks & multiline paragraphs. Rejects random numbers, digit mashing, and mixed alphanumeric noise (`12312 41jk23 41`).
+* **Landmark / Street Address (Optional):** Max 300 chars. Optional field (report submits successfully when left blank). Accepts apartment numbers, ZIP codes, intersections, landmarks, and international/Unicode characters (`Near मंदिर`, `شارع الملك فهد`, `北京市朝阳区`).
+* **Title + Description Combination:** Rejects identical Title and Description strings.
+* **Enterprise Password Security:** Enforces 8+ characters, uppercase, lowercase, numeric digit, and special character.
+* **Role-Based Access Control (RBAC):** Token-based protection for `citizen`, `volunteer`, `authority`, and `admin` roles.
+
+---
+
+## 🚀 Current Level of Progress & Status
+
+| Module / System Layer | Status | Implementation Details |
+| :--- | :---: | :--- |
+| **Authentication & RBAC** | ✅ Complete | JWT tokens, bcrypt hashing, password complexity enforcement, role guards. |
+| **Incident Reporting & GPS** | ✅ Complete | Dynamic form validation, one-click GPS location detection, image upload support. |
+| **AI Content Moderation** | ✅ Complete | Multi-tiered verification (local pattern engine + OpenAI Free Moderation API + GPT-4o-Mini emergency analyzer). |
+| **AI Priority Arbitration** | ✅ Complete | Lore-accurate UN/FEMA severity evaluation with user vs AI priority arbitration rules. |
+| **Live Interactive GIS Map** | ✅ Complete | Leaflet map with custom severity markers, popup details, and shelter overlays (SSR-safe). |
+| **Global Emergency Favicon** | ✅ Complete | Custom emergency badge SVG favicon rendered globally across browser tabs. |
+| **Shelter & Resource Management** | ✅ Complete | Full CRUD operations, capacity counters, low-stock warnings, allocation tracking. |
+| **Volunteer Task Management** | ✅ Complete | Task request submission, authority approval workflow, assignment tracking. |
+| **Tactical Dark UI Console** | ✅ Complete | High-contrast, zero-glare dark console designed for 24/7 crisis command centers. |
 
 ---
 
