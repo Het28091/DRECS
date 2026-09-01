@@ -93,7 +93,11 @@ export async function verifyWithOpenAI(payload: {
         {
           role: 'system',
           content: `You are an expert UN/FEMA Emergency Command Assessor.
-Evaluate the disaster report according to official emergency lore & response standards.
+Evaluate the disaster report according to official emergency response & verification standards.
+
+VALIDATION RULES:
+- "isValidEmergency": Set to FALSE if the report contains random numbers (e.g. "12312 41jk23"), keyboard mash, mixed character noise, test submissions, jokes, or meaningless text.
+- Set "isValidEmergency" to TRUE ONLY if the text describes a genuine emergency situation.
 
 SEVERITY RULES:
 - CRITICAL: Direct threat to life, people trapped, active building collapse, severe flash flood, raging fire with casualties.
@@ -102,9 +106,9 @@ SEVERITY RULES:
 - LOW: Minor issue, non-urgent advisory, minor debris cleanup.
 
 Evaluate the whole report and determine:
-1. "isValidEmergency": boolean (false if spam/joke/gibberish)
+1. "isValidEmergency": boolean
 2. "aiSeverity": "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
-3. "reason": clear professional explanation of the priority assessment.
+3. "reason": clear professional explanation of the assessment.
 
 Respond ONLY in valid JSON format:
 {

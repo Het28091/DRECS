@@ -43,7 +43,7 @@ export const validatePasswordSecurity = (password: string): PasswordValidationRe
 /**
  * Automated Verification Engine for Incident Reports
  * Analyzes submitted title and description text to reject gibberish,
- * random keyboard mashing, repeated character sequences, or dummy spam.
+ * random numbers, alphanumeric mashing, repetitive sequences, or dummy spam.
  */
 export const verifyIncidentContent = (title: string, description: string): ContentVerificationResult => {
   const cleanTitle = (title || '').trim();
@@ -54,10 +54,14 @@ export const verifyIncidentContent = (title: string, description: string): Conte
   }
 
   if (cleanDesc.length < 15) {
-    return { isValid: false, reason: 'Description is too brief. Please describe the emergency in detail (min 15 characters).' };
+    return { isValid: false, reason: 'Description is too brief. Please describe the emergency situation in detail (min 15 characters).' };
   }
 
-  // 1. Common keyboard mash substrings and sequences
+  const combinedText = `${cleanTitle} ${cleanDesc}`;
+  const lowerDesc = cleanDesc.toLowerCase();
+  const lowerTitle = cleanTitle.toLowerCase();
+
+  // 1. Common keyboard mash substrings
   const MASH_SUBSTRINGS = [
     'asdf', 'sdfg', 'dfgh', 'fghj', 'ghjk', 'hjkl',
     'qwert', 'werty', 'ertyu', 'rtyui', 'tyuio', 'yuiop',
@@ -67,44 +71,98 @@ export const verifyIncidentContent = (title: string, description: string): Conte
     '123456', '654321', '000000', '111111'
   ];
 
-  const lowerDesc = cleanDesc.toLowerCase();
-  const lowerTitle = cleanTitle.toLowerCase();
-
   for (const sub of MASH_SUBSTRINGS) {
     if (lowerTitle.includes(sub) || lowerDesc.includes(sub)) {
       return {
         isValid: false,
-        reason: 'Automated verification failed: Text contains invalid keyboard mashing or random repetitive characters (e.g. "' + sub + '").',
+        reason: `Automated verification failed: Text contains invalid keyboard mashing pattern ("${sub}").`,
       };
     }
   }
 
-  // 2. Word-by-word structural analysis
-  const words = cleanDesc.split(/\s+/).filter(Boolean);
-  if (words.length < 3) {
+  // 2. Digit-to-Letter Ratio Check (reject reports that are mostly numbers like "12312 41jk23 41")
+  const digitMatches = combinedText.match(/[0-9]/g) || [];
+  const letterMatches = combinedText.match(/[a-zA-Z]/g) || [];
+
+  if (letterMatches.length === 0) {
+    return {
+      isValid: false,
+      reason: 'Automated verification failed: Description must contain alphabetic text describing the incident.',
+    };
+  }
+
+  if (digitMatches.length / (digitMatches.length + letterMatches.length) > 0.35) {
+    return {
+      isValid: false,
+      reason: 'Automated verification failed: Description contains excessive random numbers or digit mashing.',
+    };
+  }
+
+  // 3. Token & Word Structure Analysis
+  const tokens = cleanDesc.split(/\s+/).filter(Boolean);
+  if (tokens.length < 3) {
     return {
       isValid: false,
       reason: 'Automated verification failed: Description must contain at least 3 distinct words.',
     };
   }
 
-  // Count gibberish words consisting only of home-row mash letters (a, s, d, f, g, h, j, k, l)
-  let gibberishWordCount = 0;
-  for (const word of words) {
-    const cleanWord = word.toLowerCase().replace(/[^a-z]/g, '');
-    if (cleanWord.length >= 3 && /^[asdfghjkl]+$/.test(cleanWord)) {
-      gibberishWordCount++;
+  let invalidNoiseTokenCount = 0;
+  let validWordCount = 0;
+
+  for (const token of tokens) {
+    const cleanToken = token.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!cleanToken) continue;
+
+    // Mixed alphanumeric noise check (e.g. "1j", "jk1", "41jk23", "3a")
+    const hasLetters = /[a-z]/.test(cleanToken);
+    const hasNumbers = /[0-9]/.test(cleanToken);
+
+    if (hasLetters && hasNumbers) {
+      invalidNoiseTokenCount++;
+      continue;
+    }
+
+    // Pure number token check (e.g. "12312", "413")
+    if (!hasLetters && hasNumbers && cleanToken.length >= 2) {
+      invalidNoiseTokenCount++;
+      continue;
+    }
+
+    // Check for readable word structure (must have vowels or be a valid short word)
+    const hasVowel = /[aeiouy]/.test(cleanToken);
+    if (cleanToken.length >= 3 && !hasVowel) {
+      invalidNoiseTokenCount++;
+      continue;
+    }
+
+    // Home-row mash letter check (e.g. "asdasd", "asda")
+    if (cleanToken.length >= 3 && /^[asdfghjkl]+$/.test(cleanToken) && !hasVowel) {
+      invalidNoiseTokenCount++;
+      continue;
+    }
+
+    if (hasLetters && cleanToken.length >= 2) {
+      validWordCount++;
     }
   }
 
-  if (gibberishWordCount >= 2 || (words.length > 0 && gibberishWordCount / words.length > 0.4)) {
+  // Rejection rules for noise tokens
+  if (invalidNoiseTokenCount > 0 && invalidNoiseTokenCount / tokens.length >= 0.3) {
     return {
       isValid: false,
-      reason: 'Automated verification failed: Description contains random keyboard mash words (e.g. "asdasd asda"). Please write a meaningful emergency description.',
+      reason: 'Automated verification failed: Description contains invalid random numbers or mixed character noise (e.g. "12312 1j jk1 41jk23"). Please enter a clear emergency description.',
     };
   }
 
-  // 3. Repeated character sequences check (e.g. "aaaaa", "!!!!!")
+  if (validWordCount < 2) {
+    return {
+      isValid: false,
+      reason: 'Automated verification failed: Description lacks meaningful words describing the emergency.',
+    };
+  }
+
+  // 4. Repeated character sequence check (e.g. "aaaaa", "!!!!!")
   if (/(.)\1{4,}/i.test(cleanTitle) || /(.)\1{4,}/i.test(cleanDesc)) {
     return {
       isValid: false,
