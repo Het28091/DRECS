@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-600 selection:text-white;
+  }
+
+  * {
+    @apply border-slate-800;
+  }
+
+  /* Tactical minimal scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-950;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-700 rounded-sm;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-amber-600;
+  }
+}
+
+@layer utilities {
+  .card-clean {
+    @apply bg-slate-900 border border-slate-800 rounded-md p-4 shadow-sm hover:border-slate-700 transition-all text-slate-100;
+  }
+}
+
+/* Leaflet map custom markers */
+.drecs-severity-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-container {
+  font: inherit;
+  background: #0f172a;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 0.375rem;
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid #334155 !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.5);
+}
+
+.leaflet-popup-content {
+  margin: 0.5rem 0.75rem;
+}
