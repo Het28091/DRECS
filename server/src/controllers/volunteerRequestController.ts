@@ -1,3 +1,4 @@
+import { canOfferHelp } from '../utils/incidentPolicy';
 import { Response } from 'express';
 import { Types } from 'mongoose';
 import { VolunteerRequest, IVolunteerRequestDocument } from '../models/VolunteerRequest';
@@ -62,6 +63,7 @@ const formatVolunteerRequest = (
   message: request.message ?? '',
   phoneNumber: request.phoneNumber ?? '',
   status: request.status,
+  canApprove: canOfferHelp(request.incidentId as any),
   ...(options.includeReviewDetails && {
     reviewedBy: request.reviewedBy ? formatUserRef(request.reviewedBy) : null,
     reviewedAt: request.reviewedAt ?? null,
@@ -73,7 +75,7 @@ const formatVolunteerRequest = (
 const populateVolunteerRequest = async (request: IVolunteerRequestDocument) => {
   await request.populate([
     { path: 'userId', select: 'name email role' },
-    { path: 'incidentId', select: 'title category severity status' },
+    { path: 'incidentId', select: 'title category severity status approvalStatus' },
     { path: 'reviewedBy', select: 'name email role' },
   ]);
   return request;
@@ -102,7 +104,7 @@ export const createVolunteerRequest = asyncHandler(
       throw createError('Incident not found', 404);
     }
 
-    if (incident.status !== 'REPORTED' && incident.status !== 'UNDER_REVIEW') {
+    if (!canOfferHelp(incident)) {
       throw createError(
         'Volunteer offers are no longer being accepted for this incident',
         400,
@@ -171,7 +173,7 @@ export const getVolunteerRequestsByIncident = asyncHandler(
     const requests = await VolunteerRequest.find({ incidentId })
       .sort({ createdAt: -1 })
       .populate('userId', 'name email role')
-      .populate('incidentId', 'title category severity status')
+      .populate('incidentId', 'title category severity status approvalStatus')
       .populate('reviewedBy', 'name email role');
 
     res.status(200).json({
@@ -200,7 +202,7 @@ export const getAllVolunteerRequests = asyncHandler(
     const requests = await VolunteerRequest.find(filter)
       .sort({ createdAt: -1 })
       .populate('userId', 'name email role')
-      .populate('incidentId', 'title category severity status')
+      .populate('incidentId', 'title category severity status approvalStatus')
       .populate('reviewedBy', 'name email role');
 
     res.status(200).json({
@@ -236,7 +238,7 @@ export const getMyVolunteerRequests = asyncHandler(
     const requests = await VolunteerRequest.find(filter)
       .sort({ createdAt: -1 })
       .populate('userId', 'name email role')
-      .populate('incidentId', 'title category severity status')
+      .populate('incidentId', 'title category severity status approvalStatus')
       .populate('reviewedBy', 'name email role');
 
     res.status(200).json({
@@ -264,76 +266,40 @@ export const reviewVolunteerRequest = asyncHandler(
       throw createError('Invalid volunteer request ID', 400);
     }
 
-    const request = await VolunteerRequest.findById(req.params.id);
-    if (!request) {
-      throw createError('Volunteer request not found', 404);
-    }
-
-    if (request.status !== 'PENDING') {
-      throw createError('Only pending requests can be reviewed', 400);
-    }
-
-    request.status = status;
-    request.reviewedBy = new Types.ObjectId(req.user.id);
-    request.reviewedAt = new Date();
-
-    if (status === 'APPROVED') {
-      const existingAssignment = await Assignment.findOne({
-        incidentId: request.incidentId,
-        volunteerId: request.userId,
-      });
-      if (existingAssignment) {
-        throw createError(
-          'This citizen is already assigned to this incident',
-          400,
-        );
-      }
-
-      await request.save();
-
-      await Assignment.create({
-        incidentId: request.incidentId,
-        volunteerId: request.userId,
-        volunteerRequestId: request._id,
-        status: 'ASSIGNED',
-        assignedAt: new Date(),
-      });
-
-      // Transition incident status to ASSIGNED ONLY if it was in early state
-      const incident = await Incident.findById(request.incidentId);
-      if (incident) {
-        if (incident.status === 'REPORTED' || incident.status === 'UNDER_REVIEW') {
+    const request = await VolunteerRequest.db.transaction(async session => {
+      const request = await VolunteerRequest.findById(req.params.id).session(session);
+      if (!request) throw createError('Volunteer request not found', 404);
+      if (request.status !== 'PENDING') throw createError('Only pending requests can be reviewed', 409);
+      const incident = await Incident.findById(request.incidentId).session(session);
+      if (status === 'APPROVED') {
+        if (!incident || !canOfferHelp(incident)) throw createError('Only approved, active incidents can receive volunteer assignments', 400);
+        const existing = await Assignment.findOne({ incidentId: request.incidentId, volunteerId: request.userId }).session(session);
+        if (existing) throw createError('This responder already has an assignment for this incident', 409);
+        await Assignment.create([{
+          incidentId: request.incidentId, volunteerId: request.userId,
+          volunteerRequestId: request._id, status: 'ASSIGNED', assignedAt: new Date(),
+        }], { session });
+        if (incident.status === 'UNDER_REVIEW') {
           incident.status = 'ASSIGNED';
-          incident.statusHistory.push({
-            status: 'ASSIGNED',
-            changedBy: new Types.ObjectId(req.user.id),
-            changedAt: new Date(),
-            note: 'Response team assigned — volunteer offer approved',
-          });
-          await incident.save();
+          incident.statusHistory.push({ status: 'ASSIGNED', changedBy: new Types.ObjectId(req.user!.id), changedAt: new Date(), note: 'Volunteer offer approved; response team assigned' });
         }
+        // Write the incident as part of the transaction to conflict with concurrent resolution.
+        incident.updatedAt = new Date();
+        await incident.save({ session });
       }
-
-      // Notify citizen
-      await dispatchNotification({
-        recipientId: request.userId.toString(),
-        title: 'Volunteer Offer Approved',
-        message: 'Your volunteer offer has been approved! An assignment task has been created for you.',
-        type: 'ASSIGNMENT_UPDATE',
-        link: `/volunteers/tasks`,
-      });
-    } else {
-      await request.save();
-
-      // Notify citizen
-      await dispatchNotification({
-        recipientId: request.userId.toString(),
-        title: 'Volunteer Offer Update',
-        message: 'Your volunteer offer was reviewed and not accepted at this time.',
-        type: 'VOLUNTEER_REQUEST',
-        link: `/incidents/${request.incidentId}`,
-      });
-    }
+      request.status = status;
+      request.reviewedBy = new Types.ObjectId(req.user!.id);
+      request.reviewedAt = new Date();
+      await request.save({ session });
+      return request;
+    });
+    await dispatchNotification({
+      recipientId: request.userId.toString(),
+      title: status === 'APPROVED' ? 'Volunteer Offer Approved' : 'Volunteer Offer Update',
+      message: status === 'APPROVED' ? 'Your offer was approved. Your assigned task is ready.' : 'Your offer was reviewed and not accepted at this time.',
+      type: 'VOLUNTEER_REQUEST',
+      link: status === 'APPROVED' ? '/volunteers/tasks' : `/incidents/${request.incidentId}`,
+    });
 
     await populateVolunteerRequest(request);
 

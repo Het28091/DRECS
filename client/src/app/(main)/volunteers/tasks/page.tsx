@@ -1,4 +1,5 @@
 'use client';
+import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -52,9 +53,8 @@ export default function VolunteerTasksPage() {
     }
   }, [user, isAuthLoading, router]);
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setIsLoading(true); setError(null); }
     try {
       const data = await fetchMyAssignments();
       setAssignments(data);
@@ -69,6 +69,8 @@ export default function VolunteerTasksPage() {
       setIsLoading(false);
     }
   }, []);
+
+  useLiveRefresh(() => load(true), Boolean(user));
 
   useEffect(() => {
     if (isAuthLoading) return;

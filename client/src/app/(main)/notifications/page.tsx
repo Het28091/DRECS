@@ -1,4 +1,5 @@
 'use client';
+import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
@@ -17,8 +18,8 @@ export default function NotificationsPage() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const fetchNotifications = useCallback(async () => {
-    setLoading(true);
+  const fetchNotifications = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await getMyNotifications();
       setNotifications(data.notifications || []);
@@ -30,14 +31,15 @@ export default function NotificationsPage() {
     }
   }, []);
 
+  useLiveRefresh(() => fetchNotifications(true), Boolean(user));
+
   useEffect(() => {
     fetchNotifications();
 
     // Listen for real-time notification socket events
     const socket = getSocket();
     const handleNewNotification = (newNotif: Notification) => {
-      setNotifications((prev) => [newNotif, ...prev]);
-      setUnreadCount((c) => c + 1);
+      void fetchNotifications(true);
     };
 
     socket.on('notification', handleNewNotification);

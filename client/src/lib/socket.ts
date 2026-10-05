@@ -6,18 +6,10 @@ let socket: Socket | null = null;
 export const getSocket = (): Socket => {
   if (!socket) {
     socket = io(SOCKET_URL, {
-      autoConnect: true,
+      autoConnect: false,
       transports: ['websocket', 'polling'],
       withCredentials: true,
     });
   }
   return socket;
-};
-
-export const joinSocketRoom = (userId?: string, role?: string) => {
-  const s = getSocket();
-  if (!s.connected) {
-    s.connect();
-  }
-  s.emit('join_room', { userId, role });
 };

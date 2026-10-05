@@ -123,17 +123,17 @@ const resourceSchema = new Schema<IResourceDocument>(
   },
   {
     timestamps: true,
+    optimisticConcurrency: true,
   },
 );
 
 resourceSchema.pre('save', function (next) {
+  if (this.status === 'MAINTENANCE') return next();
   if (this.availableQuantity <= 0) {
     this.status = 'DEPLETED';
   } else if (this.availableQuantity < this.quantity * 0.2) {
-    if (this.status !== 'MAINTENANCE') {
-      this.status = 'LOW_STOCK';
-    }
-  } else if (this.status !== 'MAINTENANCE') {
+    this.status = 'LOW_STOCK';
+  } else {
     this.status = 'AVAILABLE';
   }
   next();

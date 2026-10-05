@@ -9,7 +9,7 @@ import { AuthRequest } from '../middleware/authMiddleware';
  * @access  Authenticated
  */
 export const getMapIncidents = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  const incidents = await Incident.find({})
+  const incidents = await Incident.find(['authority', 'admin'].includes(_req.user?.role ?? '') ? {} : { approvalStatus: 'APPROVED' })
     .select('title category severity status location')
     .sort({ createdAt: -1 })
     .lean();

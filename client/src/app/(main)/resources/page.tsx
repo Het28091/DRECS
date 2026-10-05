@@ -1,4 +1,5 @@
 'use client';
+import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
 import { useState, useEffect, useCallback } from 'react';
 import { Package, Plus, Filter, AlertTriangle, CheckCircle2, ShieldAlert, Wrench, Send, RefreshCw, Trash2, Edit } from 'lucide-react';
@@ -52,34 +53,31 @@ export default function ResourcesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const fetchResources = useCallback(async () => {
-    setLoading(true);
+  const fetchResources = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await getAllResources({
         category: selectedCategory || undefined,
         status: selectedStatus || undefined,
       });
       setResources(data.resources || []);
+      if (isAuthorityOrAdmin) {
+        const data = await getAllIncidents();
+        setIncidents(data.incidents.filter(i => i.approvalStatus === 'APPROVED' && ['UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS'].includes(i.status)).map(i => ({ id: i.id, title: i.title })));
+      }
     } catch (err) {
       console.error('Failed to fetch resources', err);
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory, selectedStatus]);
+  }, [selectedCategory, selectedStatus, isAuthorityOrAdmin]);
+
+  useLiveRefresh(() => fetchResources(true), Boolean(user));
 
   useEffect(() => {
     fetchResources();
   }, [fetchResources]);
 
-  useEffect(() => {
-    if (isAuthorityOrAdmin) {
-      getAllIncidents()
-        .then((res) => {
-          setIncidents(res.incidents.map((i) => ({ id: i.id, title: i.title })));
-        })
-        .catch((err) => console.error(err));
-    }
-  }, [isAuthorityOrAdmin]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -231,7 +229,7 @@ export default function ResourcesPage() {
           ))}
         </select>
 
-        <Button variant="ghost" size="sm" onClick={fetchResources} className="ml-auto text-slate-400 hover:text-white">
+        <Button variant="ghost" size="sm" onClick={() => fetchResources()} className="ml-auto text-slate-400 hover:text-white">
           <RefreshCw size={14} className="mr-1" /> Refresh
         </Button>
       </Card>

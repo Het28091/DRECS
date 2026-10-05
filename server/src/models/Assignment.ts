@@ -66,6 +66,7 @@ const assignmentSchema = new Schema<IAssignmentDocument>(
   },
   {
     timestamps: true,
+    optimisticConcurrency: true,
   },
 );
 

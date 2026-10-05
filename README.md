@@ -1,183 +1,75 @@
 # DRECS — Disaster Response & Emergency Coordination System
 
-[![Production Readiness](https://img.shields.io/badge/Status-Production--Ready-emerald?style=flat-square)](#)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.4.5-blue?style=flat-square&logo=typescript)](#)
-[![Next.js](https://img.shields.io/badge/Next.js-14.2.3-black?style=flat-square&logo=next.js)](#)
-[![React](https://img.shields.io/badge/React-18.3.1-61DAFB?style=flat-square&logo=react)](#)
-[![Node.js](https://img.shields.io/badge/Node.js-20.x-green?style=flat-square&logo=node.js)](#)
-[![Express](https://img.shields.io/badge/Express-4.19.2-lightgrey?style=flat-square&logo=express)](#)
-[![MongoDB](https://img.shields.io/badge/Database-MongoDB%20Atlas%20(Mongoose%208.4.0)-forestgreen?style=flat-square&logo=mongodb)](#)
-[![Socket.IO](https://img.shields.io/badge/RealTime-Socket.IO%204.7.5-010101?style=flat-square&logo=socket.io)](#)
-[![OpenAI](https://img.shields.io/badge/AI-OpenAI%20SDK%207.8.0-purple?style=flat-square&logo=openai)](#)
+DRECS coordinates incident reports, authority review, volunteer response, shelters, resources, and notifications.
 
-> **DRECS** is a full-stack, enterprise-grade emergency dispatch and crisis management platform designed to centralize incident reporting, coordinate emergency authorities, mobilize volunteer response forces, and optimize resource allocation during natural and man-made disasters.
+## Architecture
 
----
+- **Client:** Next.js 14 App Router, React, TypeScript, Tailwind, Leaflet, and Recharts. Pages live in client/src/app; API wrappers in client/src/lib; authentication and socket connections are shared providers.
+- **API:** Express and TypeScript. Routes authenticate JWTs against the current user record, apply role guards and body validation, and call controllers.
+- **Persistence:** MongoDB with Mongoose models for users, incidents, volunteer requests, assignments, shelters, resources, and notifications.
+- **Live updates:** Authenticated Socket.IO connections receive their own notifications and data invalidation events. Pages re-fetch through their authorized API on changes, reconnect, focus, and every 30 seconds while visible. Form drafts remain in place.
 
-## 📌 Real-Life Emergency Use Cases
+## Incident workflow
 
-In high-stress disaster scenarios—such as flash floods, severe earthquakes, cyclones, fires, or structural collapses—communication channels quickly become overwhelmed with duplicate, ambiguous, or false reports. **DRECS** solves these critical real-world bottlenecks:
+1. A citizen or volunteer submits a title, description, category, severity, and a point selected on the map. Browser location is an optional explicit action. Coordinate inputs are not exposed in the report form.
+2. The report starts with approvalStatus=PENDING and response status REPORTED. Only its reporter and authority/admin users can inspect it. Public listings, map markers, and community statistics require explicit approval.
+3. An authority opens the report from Dashboard and selects **Approve report** or **Reject report**. The decision is recorded in the timeline and sent to the reporter as a notification. Approval makes the report public and normally moves it to UNDER_REVIEW. Rejection leaves it private.
+4. Approved active incidents accept volunteer offers. Skills, experience, an explanation of help, and a reachable phone number are required. A user may have only one pending/approved offer per incident; rejected users can reapply.
+5. Authority approval of a volunteer offer creates an assignment and moves an incident awaiting responders to ASSIGNED. These writes run together in a MongoDB transaction.
+6. The responder moves their task through ASSIGNED → ACCEPTED → IN_PROGRESS → COMPLETED. Starting a task moves an ASSIGNED incident to IN_PROGRESS. Completing a task does not resolve the incident; the authority decides that.
+7. Authorities can resolve an approved incident only after all assignments are completed or removed. RESOLVED can move to CLOSED; CLOSED is terminal. No new offers, assignments, or resource allocations are accepted for terminal incidents.
 
-1. **Rapid Field Incident Dispatch & GPS Triangulation**
-   - Citizens and field personnel can instantly submit incident reports with automated browser GPS coordinates (`Latitude`/`Longitude`) and landmark addresses, eliminating location ambiguity during emergency rescues.
+The incident response transitions are centralized in server/src/utils/incidentPolicy.ts. Authority forms show the permitted next states. Authorities can also begin response or resolve an incident without volunteer assignments, for example when their own team handles it. Removing the last pending assignment returns an ASSIGNED incident to UNDER_REVIEW; completed task history is retained.
 
-2. **Automated AI Content Moderation & Spam Shield**
-   - Automatically filters out keyboard-mash spam (e.g., `asdasd`, `qwerty`), random numbers (`12312 41jk23`), mixed character noise, and non-emergency test entries before they clutter emergency command queues.
+**No AI is used in reporting.** The submitted severity is preserved. The OpenAI dependency and verification utilities have been removed. Text length, sanitization, field validation, daily limits, and authority review remain.
 
-3. **Lore-Accurate AI Priority Arbitration (UN / FEMA Standard)**
-   - Evaluates submitted reports against official disaster severity guidelines (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`).
-   - **Arbitration Rule:** If the user-selected priority matches the AI assessment, it is confirmed. If they differ, the **AI makes the final decision** to prevent panic-induced priority inflation or dangerous under-reporting.
+## Daily spam prevention
 
-4. **Real-time Incident Command Console for Authorities**
-   - Emergency authorities obtain a real-time live map interface (Leaflet GIS) displaying incident severity pinpoints and shelter status, with live WebSocket updates (`Socket.IO`).
+Each user can submit **5 incident reports per calendar day**, resetting at **00:00 Asia/Kolkata (UTC+05:30)**. An atomic per-user reservation enforces the limit across concurrent submissions and application instances. Existing reports created earlier that day also count. Failed report persistence releases the reservation. The API returns HTTP 429 when the limit is reached.
 
-5. **Shelter & Resource Inventory Tracking**
-   - Tracks shelter capacity, current occupancy, and available emergency supplies (food, water, medical kits, rescue boats) to prevent resource starvation in crisis zones.
+## Screens and state rules
 
-6. **Volunteer Force Mobilization**
-   - Enables volunteers to apply, view assigned field tasks, update task progress, and submit status logs under authority supervision.
+- **Dashboard** contains incident lists, status/category/severity filters, and authority approval filters. The previous /incidents and /incidents/my list routes redirect here.
+- **Shelters:** Cards are read-only. Click Edit, change the form, then Save Changes or Cancel. ACTIVE/FULL follow occupancy automatically; INACTIVE is preserved. Occupancy cannot exceed capacity.
+- **Resources:** Availability determines AVAILABLE, LOW_STOCK (below 20%), or DEPLETED. MAINTENANCE is retained and blocks allocations. Allocation details are authority-only.
+- **Volunteer Force:** Summary counts, search by responder/email/incident, task status filtering, incident links, status badges, and assignment removal controls.
+- **Notifications:** The navbar bell displays an unread count and recent messages. New notifications appear as dismissible popups. Opening one marks it read; the Notifications page retains history.
+- **Sidebar:** The separate Incidents item and bottom footer text have been removed.
 
----
+## Setup
 
-## 🚀 Current Level of Progress & Status
+Install dependencies in both directories using npm install. Use Node.js 20+ and a MongoDB replica set or Atlas deployment (transactions are required for volunteer approvals).
 
-| Module / System Layer | Status | Implementation Details |
-| :--- | :---: | :--- |
-| **Authentication & RBAC** | ✅ Complete | JWT tokens, bcrypt hashing, 5-point password complexity enforcement, role guards (`citizen`, `volunteer`, `authority`, `admin`). |
-| **Incident Reporting & GPS** | ✅ Complete | Dynamic form validation, one-click GPS location detection, image upload support. |
-| **AI Content Moderation** | ✅ Complete | Multi-tiered verification (local pattern engine + OpenAI Free Moderation API + GPT-4o-Mini emergency analyzer). |
-| **AI Priority Arbitration** | ✅ Complete | Lore-accurate UN/FEMA severity evaluation with user vs AI priority arbitration rules. |
-| **Live Interactive GIS Map** | ✅ Complete | Leaflet map with custom severity markers, popup details, and shelter overlays (SSR-safe). |
-| **Global Emergency Favicon** | ✅ Complete | Custom emergency badge SVG favicon rendered globally across browser tabs. |
-| **Shelter & Resource Management** | ✅ Complete | Full CRUD operations, capacity counters, low-stock warnings, allocation tracking. |
-| **Volunteer Task Management** | ✅ Complete | Task request submission, authority approval workflow, assignment tracking. |
-| **Tactical Dark UI Console** | ✅ Complete | High-contrast, zero-glare dark console designed for 24/7 crisis command centers. |
-| **WebSocket Real-time Sync** | ✅ Complete | Socket.IO server emitting live notifications for incident updates and assignments. |
-| **System Analytics Dashboard** | ✅ Complete | Dynamic charts (Recharts) visualizing operational metrics, resource status, and severity breakdown. |
+Create server/.env with your own values:
 
----
-
-## 🛠️ Complete Tech Stack & Exact Service Versions
-
-### Backend Services & Dependencies (`server/package.json`)
-* **Node.js**: Runtime environment (v18+ / v20.x recommended)
-* **TypeScript**: `^5.4.5` — Full end-to-end static typing
-* **Express.js**: `^4.19.2` — REST API framework
-* **MongoDB Atlas & Mongoose**: `^8.4.0` — Cloud NoSQL database with ODM schemas, validation, and hooks
-* **Socket.IO**: `^4.7.5` — Real-time bi-directional event transport for live dispatch notifications
-* **OpenAI SDK**: `^7.8.0` — Content moderation (`omni-moderation-latest`) & disaster severity assessment (`gpt-4o-mini`)
-* **Zod**: `^3.23.8` — Schema declaration, validation, and sanitization
-* **jsonwebtoken (JWT)**: `^9.0.2` — Stateless role-based authentication tokens
-* **bcryptjs**: `^2.4.3` — Password hashing with salt factor 12
-* **Multer**: `^1.4.5-lts.1` — Multipart form-data parser for media/photo uploads
-* **CORS**: `^2.8.5` — Cross-origin resource sharing policy management
-* **Dotenv**: `^16.4.5` — Environment configuration management
-* **Morgan**: `^1.10.0` — HTTP request logger
-
-### Frontend Services & Dependencies (`client/package.json`)
-* **Next.js**: `14.2.3` (App Router) — Server-side rendering, static page generation, and optimized client routing
-* **React & React DOM**: `^18.3.1` — UI component framework
-* **TypeScript**: `^5.4.5` — Full frontend typing and API contract synchronization
-* **Tailwind CSS**: `^3.4.3` — Utility-first tactical dark console styling
-* **Lucide React**: `^0.383.0` — Unified iconography set
-* **Leaflet**: `^1.9.4` & **react-leaflet**: `^4.2.1` — Interactive GIS disaster mapping (SSR-safe)
-* **Recharts**: `^2.12.7` — Telemetry & analytics data visualizations
-* **Axios**: `^1.7.2` — HTTP client with interceptors for JWT token attachment and refresh
-* **Socket.IO Client**: `^4.7.5` — Real-time event listener for live alerts and updates
-* **PostCSS**: `^8.4.38` & **Autoprefixer**: `^10.4.19` — CSS preprocessing pipeline
-
----
-
-## 💻 Zero-Friction Setup Guide (Cloning to Another Laptop)
-
-To run **DRECS** on any fresh machine/laptop, simply follow these steps:
-
-### Step 1: Clone the Repository
-```bash
-git clone https://github.com/Het28091/DRECS.git
-cd DRECS
-```
-
----
-
-### Step 2: Configure & Start Backend (`server`)
-
-Open a terminal in the root directory:
-
-```bash
-cd server
-npm install
-```
-
-Create a `.env` file in the `server/` directory:
 ```env
 PORT=5000
 NODE_ENV=development
-MONGODB_URI=mongodb+srv://hetprajapati:hetprajapati@cluster0.79mz6xp.mongodb.net/drecs?retryWrites=true&w=majority
-JWT_SECRET=drecs_production_jwt_secret_key_2026_secure
+MONGODB_URI=mongodb://127.0.0.1:27017/drecs?replicaSet=rs0
+JWT_SECRET=replace-with-a-strong-secret
 CLIENT_URL=http://localhost:3000
-OPENAI_API_KEY=your_openai_api_key_here
-```
-*(Note: If `OPENAI_API_KEY` is left blank, DRECS automatically falls back to its built-in local rule-based verification engine!)*
-
-Run the backend dev server:
-```bash
-npm run dev
-```
-*(Server will start on `http://localhost:5000`)*
-
----
-
-### Step 3: Configure & Start Frontend (`client`)
-
-Open a second terminal in the root directory:
-
-```bash
-cd client
-npm install
 ```
 
-Create a `.env.local` file in the `client/` directory:
+Create client/.env.local:
+
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:5000/api
 NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
 ```
 
-Run the frontend client dev server:
-```bash
-npm run dev
-```
-*(Client will start on `http://localhost:3000`)*
+Run npm run dev in server and client, then visit http://localhost:3000.
 
-Open **[http://localhost:3000](http://localhost:3000)** in your browser!
+## Existing data
 
----
+Reports without an approval field are treated as pending; they are intentionally hidden from the community until an authority reviews them. Historical AI fields may remain in stored documents but are no longer used or returned. No existing database records are automatically approved or deleted.
 
-## 🔒 Comprehensive Validation & Security Posture
+A partial unique index named active_offer_per_incident prevents simultaneous duplicate pending/approved volunteer offers. Before deploying onto an existing database, check for duplicate active offers for each incident/user and reconcile them before building this index. Mongoose creates the index when automatic indexing is enabled; deployments with autoIndex disabled must apply model indexes through their normal migration process. Do not blindly drop existing indexes or delete request history.
 
-DRECS enforces strict, multi-layered security validation across all forms:
+## Verification
 
-* **Title Field:** Min 3, Max 120 chars. Whitespace-only inputs rejected. Sanitized against XSS (`<script>`, `<img onerror>`), SQL Injection, and HTML tags.
-* **Description Field:** Min 10, Max 2000 chars. Whitespace-only inputs rejected. Preserves line breaks & multiline paragraphs. Rejects random numbers, digit mashing, and mixed alphanumeric noise (`12312 41jk23 41`).
-* **Landmark / Street Address (Optional):** Max 300 chars. Optional field (report submits successfully when left blank). Accepts apartment numbers, ZIP codes, intersections, landmarks, and international/Unicode characters (`Near मंदिर`, `شارع الملك فهد`, `北京市朝阳区`).
-* **Title + Description Combination:** Rejects identical Title and Description strings.
-* **Enterprise Password Security:** Enforces 8+ characters, uppercase, lowercase, numeric digit, and special character.
-* **Role-Based Access Control (RBAC):** Token-based protection for `citizen`, `volunteer`, `authority`, and `admin` roles.
+- server: npm test runs workflow/controller tests with mocked persistence and a real local Socket.IO authentication test. Both client and server dependencies must be installed for the socket client test.
+- server: npm run build compiles the API.
+- client: npm run build validates types and creates the production build.
+- Optional UI preview: run node tests/ui-preview.cjs from server with the client on port 3000. This loopback-only fixture API uses in-memory sample data and never connects to MongoDB. Sign in using authority@example.test or citizen@example.test and any nonempty password. Stop it before starting the real API; it uses port 5000.
 
----
-
-## 🔮 Post-Completion Expectations & Roadmap
-
-Future operational enhancements planned for deployment in low-connectivity disaster zones:
-
-1. **Progressive Web App (PWA) Offline Synchronization**
-   - Local storage of incident submissions using IndexedDB, automatically syncing with MongoDB when mobile network connectivity is restored.
-2. **Twilio SMS Fallback Gateway**
-   - SMS-based report submission and emergency alerts for citizens in areas without cellular data coverage.
-3. **Computer Vision Damage Assessment**
-   - Integration of multi-modal AI vision models (Gemini 1.5 Vision / GPT-4o Vision) to automatically verify structural damage photos submitted by citizens.
-
----
-
-## 📄 License
-Distributed under the MIT License. See `LICENSE` for more information.
+Controller tests do not replace integration testing against a disposable MongoDB replica set, especially for transactions, unique-index migration, and concurrent quota enforcement. The UI fixture validates screen behavior only, not backend authorization.

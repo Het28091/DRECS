@@ -75,12 +75,13 @@ const volunteerRequestSchema = new Schema<IVolunteerRequestDocument>(
   },
   {
     timestamps: true,
+    optimisticConcurrency: true,
     collection: 'volunteerRequests',
   },
 );
 
 // One pending/approved offer per user per incident (rejected users may re-apply later via new doc or status update in future APIs)
-volunteerRequestSchema.index({ incidentId: 1, userId: 1 });
+volunteerRequestSchema.index({ incidentId: 1, userId: 1 }, { name: 'active_offer_per_incident', unique: true, partialFilterExpression: { status: { $in: ['PENDING', 'APPROVED'] } } });
 volunteerRequestSchema.index({ status: 1, createdAt: -1 });
 
 export const VolunteerRequest = model<IVolunteerRequestDocument>(

@@ -1,3 +1,4 @@
+import { canOfferHelp } from '../utils/incidentPolicy';
 import { Response } from 'express';
 import { Types } from 'mongoose';
 import { Resource, IResourceDocument, RESOURCE_CATEGORIES, RESOURCE_STATUSES } from '../models/Resource';
@@ -53,7 +54,7 @@ export const getAllResources = asyncHandler(async (req: AuthRequest, res: Respon
   res.status(200).json({
     success: true,
     count: resources.length,
-    resources: resources.map(formatResource),
+    resources: resources.map(r => ({ ...formatResource(r), ...(!['authority', 'admin'].includes(req.user?.role ?? '') && { allocations: [] }) })),
   });
 });
 
@@ -76,7 +77,7 @@ export const getResourceById = asyncHandler(async (req: AuthRequest, res: Respon
 
   res.status(200).json({
     success: true,
-    resource: formatResource(resource),
+    resource: { ...formatResource(resource), ...(!['authority', 'admin'].includes(req.user?.role ?? '') && { allocations: [] }) },
   });
 });
 
@@ -97,7 +98,7 @@ export const createResource = asyncHandler(async (req: AuthRequest, res: Respons
   }
 
   const numQuantity = Number(quantity);
-  if (isNaN(numQuantity) || numQuantity < 0) {
+  if (!Number.isFinite(numQuantity) || numQuantity < 0) {
     throw createError('Quantity must be a positive number', 400);
   }
 
@@ -145,7 +146,7 @@ export const updateResource = asyncHandler(async (req: AuthRequest, res: Respons
   }
   if (quantity !== undefined) {
     const newQuantity = Number(quantity);
-    if (isNaN(newQuantity) || newQuantity < 0) {
+    if (!Number.isFinite(newQuantity) || newQuantity < 0) {
       throw createError('Quantity must be a non-negative number', 400);
     }
     // Calculate total currently allocated
@@ -225,8 +226,10 @@ export const allocateResource = asyncHandler(async (req: AuthRequest, res: Respo
     throw createError('Resource not found', 404);
   }
 
+  if (!canOfferHelp(incident)) throw createError('Resources can only be allocated to approved, active incidents', 400);
+  if (resource.status === 'MAINTENANCE') throw createError('Resource is under maintenance', 400);
   const allocQty = Number(quantity);
-  if (isNaN(allocQty) || allocQty <= 0) {
+  if (!Number.isFinite(allocQty) || allocQty <= 0) {
     throw createError('Allocation quantity must be greater than 0', 400);
   }
 

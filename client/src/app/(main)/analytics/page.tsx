@@ -1,4 +1,5 @@
 'use client';
+import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -59,8 +60,8 @@ export default function AnalyticsPage() {
     }
   }, [user, isAuthLoading, router]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [ovData, trData, volData, resData] = await Promise.all([
         getOverviewStats(),
@@ -79,6 +80,8 @@ export default function AnalyticsPage() {
       setLoading(false);
     }
   }, []);
+
+  useLiveRefresh(() => loadData(true), user?.role === 'authority' || user?.role === 'admin');
 
   useEffect(() => {
     if (user?.role === 'authority' || user?.role === 'admin') {
@@ -108,7 +111,7 @@ export default function AnalyticsPage() {
           </p>
         </div>
 
-        <Button variant="ghost" onClick={loadData} className="text-slate-400 hover:text-white border border-slate-800">
+        <Button variant="ghost" onClick={() => loadData()} className="text-slate-400 hover:text-white border border-slate-800">
           <RefreshCw size={14} className="mr-2" /> Refresh Telemetry
         </Button>
       </div>

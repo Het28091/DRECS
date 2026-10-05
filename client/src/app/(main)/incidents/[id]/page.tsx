@@ -1,4 +1,5 @@
 'use client';
+import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -22,7 +23,7 @@ import { Card, CardTitle } from '@/components/ui/Card';
 import { StatusBadge, SeverityBadge } from '@/components/incidents/IncidentBadges';
 import { StatusTimeline } from '@/components/incidents/StatusTimeline';
 import { AssignmentStatusBadge } from '@/components/volunteers/AssignmentStatusBadge';
-import { fetchIncidentById, updateIncidentStatus } from '@/lib/incidents';
+import { fetchIncidentById, updateIncidentStatus, reviewIncident } from '@/lib/incidents';
 import { fetchIncidentAssignments, fetchMyAssignments } from '@/lib/assignments';
 import {
   createVolunteerRequest,
@@ -30,7 +31,6 @@ import {
   fetchMyVolunteerRequests,
   reviewVolunteerRequest,
 } from '@/lib/volunteerRequests';
-import { INCIDENT_STATUSES } from '@/lib/constants';
 import { formatDate } from '@/lib/utils';
 import {
   Assignment,
@@ -105,25 +105,25 @@ export default function IncidentDetailPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [requestMessage, setRequestMessage] = useState<string | null>(null);
+  const [offerErrors, setOfferErrors] = useState<Record<string, string>>({});
   const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   const isAuthority = user?.role === 'authority' || user?.role === 'admin';
-  const isCitizen = user?.role === 'citizen';
+  const isCitizen = user?.role === 'citizen' || user?.role === 'volunteer';
   const backHref =
     user?.role === 'volunteer'
       ? '/volunteers/tasks'
       : isAuthority
-        ? '/incidents'
-        : '/incidents/my';
+        ? '/dashboard'
+        : '/dashboard';
 
-  const loadIncident = useCallback(async () => {
+  const loadIncident = useCallback(async (silent = false) => {
     if (!id) return;
-    setIsLoading(true);
-    setError(null);
+    if (!silent) { setIsLoading(true); setError(null); }
     try {
       const data = await fetchIncidentById(id);
       setIncident(data);
-      setStatusDraft(data.status);
+      setStatusDraft(current => !silent || !current || !(data.allowedTransitions ?? []).includes(current) ? data.status : current);
     } catch (err: unknown) {
       const axiosErr = err as {
         response?: { status?: number; data?: { message?: string } };
@@ -215,6 +215,11 @@ export default function IncidentDetailPage() {
     loadCitizenVolunteerState,
   ]);
 
+  useLiveRefresh(async () => {
+    await loadIncident(true);
+    await Promise.all([loadAssignments(), loadVolunteerRequests(), loadCitizenVolunteerState()]);
+  }, Boolean(user) && !isUpdating && !isSubmittingRequest && !reviewingId);
+
   // Citizen's own request state for this incident
   const myRequest = useMemo(() => {
     if (!user) return null;
@@ -238,6 +243,17 @@ export default function IncidentDetailPage() {
       }) ?? null
     );
   }, [id, myAssignments]);
+
+  const handleIncidentReview = async (status: 'APPROVED' | 'REJECTED') => {
+    if (!incident || isUpdating) return;
+    setIsUpdating(true);
+    setError(null);
+    try {
+      const updated = await reviewIncident(incident.id, status);
+      setIncident(updated); setStatusDraft(updated.status);
+    } catch (err: any) { setError(err.response?.data?.message || 'Unable to review report.'); }
+    finally { setIsUpdating(false); }
+  };
 
   const handleStatusUpdate = async () => {
     if (!incident || !statusDraft || statusDraft === incident.status) return;
@@ -265,6 +281,16 @@ export default function IncidentDetailPage() {
   const handleSubmitRequest = async () => {
     if (!incident) return;
 
+    if (isSubmittingRequest) return;
+    const errors: Record<string, string> = {};
+    const parsedSkills = skills.split(',').map(s => s.trim()).filter(Boolean);
+    if (!parsedSkills.length || parsedSkills.length > 10 || parsedSkills.some(s => s.length < 2 || s.length > 80)) errors.skills = 'Enter 1 to 10 skills, each 2 to 80 characters.';
+    if (experience.trim().length < 10 || experience.trim().length > 2000) errors.experience = 'Describe your experience in 10 to 2000 characters.';
+    if (message.trim().length < 10 || message.trim().length > 1000) errors.message = 'Describe how you can help in 10 to 1000 characters.';
+    const digits = phoneNumber.replace(/\D/g, '');
+    if (!/^\+?[0-9 ()-]{10,20}$/.test(phoneNumber.trim()) || digits.length < 10 || digits.length > 15 || /^(.)\1+$/.test(digits)) errors.phoneNumber = 'Enter a valid phone number with 10 to 15 digits.';
+    setOfferErrors(errors);
+    if (Object.keys(errors).length) return;
     setIsSubmittingRequest(true);
     setRequestMessage(null);
     setError(null);
@@ -275,9 +301,9 @@ export default function IncidentDetailPage() {
         .filter(Boolean);
       const created = await createVolunteerRequest(incident.id, {
         skills: skillsList,
-        experience,
-        message,
-        phoneNumber,
+        experience: experience.trim(),
+        message: message.trim(),
+        phoneNumber: phoneNumber.trim(),
       });
       setVolunteerRequests((prev) => [created, ...prev]);
       await loadCitizenVolunteerState();
@@ -397,6 +423,14 @@ export default function IncidentDetailPage() {
         <Card className="mb-4 border-red-800/60 text-red-400 text-sm">{error}</Card>
       )}
 
+      {incident.approvalStatus !== 'APPROVED' && <Card className="mb-5 border-amber-500/30">
+        <h2 className="font-semibold text-amber-300">{incident.approvalStatus === 'REJECTED' ? 'Report rejected' : 'Awaiting authority approval'}</h2>
+        <p className="text-sm text-slate-400 mt-1">This report is visible only to its reporter and authorities.</p>
+        {isAuthority && incident.approvalStatus === 'PENDING' && <div className="flex gap-3 mt-4">
+          <Button loading={isUpdating} onClick={() => handleIncidentReview('APPROVED')}>Approve report</Button>
+          <Button variant="danger" loading={isUpdating} onClick={() => handleIncidentReview('REJECTED')}>Reject report</Button>
+        </div>}
+      </Card>}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-5">
           <Card>
@@ -452,13 +486,16 @@ export default function IncidentDetailPage() {
             </dl>
           </Card>
 
-          {isCitizen && (
+          {isCitizen && incident.approvalStatus === 'APPROVED' && ['UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS'].includes(incident.status) && (
             <Card>
               <div className="flex items-center gap-2 mb-4">
                 <HandHeart size={16} className="text-orange-400" />
                 <CardTitle className="!mb-0">Offer Help</CardTitle>
               </div>
 
+              <p className="text-xs text-slate-400 mb-3">All fields are required. Share relevant skills and a reachable phone number.</p>
+              {Object.keys(offerErrors).length > 0 && <ul role="alert" className="text-sm text-red-400 mb-3">{Object.entries(offerErrors).map(([field, text]) => <li key={field}>{text}</li>)}</ul>}
+              {requestMessage && <p role="status" className="text-sm text-green-400 mb-3">{requestMessage}</p>}
               {myRequest && myRequest.status !== 'REJECTED' ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
@@ -500,7 +537,7 @@ export default function IncidentDetailPage() {
                       Skills (comma separated)
                     </label>
                     <input
-                      id="vr-skills"
+                      id="vr-skills" maxLength={810} aria-invalid={!!offerErrors.skills}
                       type="text"
                       value={skills}
                       onChange={(e) => setSkills(e.target.value)}
@@ -516,7 +553,7 @@ export default function IncidentDetailPage() {
                       Experience
                     </label>
                     <textarea
-                      id="vr-experience"
+                      id="vr-experience" maxLength={2000} aria-invalid={!!offerErrors.experience}
                       value={experience}
                       onChange={(e) => setExperience(e.target.value)}
                       placeholder="Describe any relevant experience"
@@ -532,7 +569,7 @@ export default function IncidentDetailPage() {
                       Message
                     </label>
                     <textarea
-                      id="vr-message"
+                      id="vr-message" maxLength={1000} aria-invalid={!!offerErrors.message}
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       placeholder="How would you like to help?"
@@ -548,7 +585,7 @@ export default function IncidentDetailPage() {
                       Phone Number
                     </label>
                     <input
-                      id="vr-phone"
+                      id="vr-phone" maxLength={20} aria-invalid={!!offerErrors.phoneNumber}
                       type="tel"
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value)}
@@ -677,6 +714,7 @@ export default function IncidentDetailPage() {
                             variant="primary"
                             size="sm"
                             loading={reviewingId === request.id}
+                            disabled={request.canApprove === false}
                             onClick={() => handleReview(request.id, 'APPROVED')}
                           >
                             <CheckCircle2 size={14} />
@@ -707,7 +745,7 @@ export default function IncidentDetailPage() {
             <StatusTimeline history={history} showActor={isAuthority} />
           </Card>
 
-          {isAuthority && (
+          {isAuthority && incident.approvalStatus === 'APPROVED' && (
             <Card>
               <div className="flex items-center gap-2 mb-4">
                 <Shield size={16} className="text-orange-400" />
@@ -726,7 +764,7 @@ export default function IncidentDetailPage() {
                 onChange={(e) => setStatusDraft(e.target.value as IncidentStatus)}
                 className={`${selectClass} mb-3`}
               >
-                {INCIDENT_STATUSES.map((s) => (
+                {[incident.status, ...(incident.allowedTransitions ?? [])].filter(s => s !== 'ASSIGNED' || assignments.some(a => a.status !== 'COMPLETED')).filter(s => !['RESOLVED', 'CLOSED'].includes(s) || s === incident.status || !assignments.some(a => a.status !== 'COMPLETED')).map((s) => (
                   <option key={s} value={s}>
                     {s.replace(/_/g, ' ')}
                   </option>

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, FormEvent } from 'react';
+import dynamic from 'next/dynamic';
+import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, AlertTriangle, MapPin, Navigation, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -8,6 +9,8 @@ import { Card } from '@/components/ui/Card';
 import { createIncident } from '@/lib/incidents';
 import { INCIDENT_CATEGORIES, INCIDENT_SEVERITIES } from '@/lib/constants';
 import { IncidentSeverity } from '@/types';
+
+const LocationPicker = dynamic(() => import('@/components/map/LocationPicker'), { ssr: false, loading: () => <div className="h-72 rounded-xl bg-slate-800 animate-pulse" aria-label="Loading location map" /> });
 
 const inputClass =
   'w-full px-3.5 py-2.5 bg-slate-900/80 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 text-sm transition-all';
@@ -31,11 +34,6 @@ export default function ReportIncidentPage() {
   const [isLocating, setIsLocating] = useState(false);
   const [locSuccessMsg, setLocSuccessMsg] = useState('');
 
-  // Auto-detect browser location on page load
-  useEffect(() => {
-    handleDetectLocation();
-  }, []);
-
   const handleDetectLocation = () => {
     if (typeof window !== 'undefined' && 'geolocation' in navigator) {
       setIsLocating(true);
@@ -46,11 +44,11 @@ export default function ReportIncidentPage() {
           const lng = position.coords.longitude.toFixed(6);
           setLatitude(lat);
           setLongitude(lng);
-          setLocSuccessMsg(`GPS Coordinates detected (${lat}, ${lng})`);
+          setLocSuccessMsg('Your location is selected. Click the map to adjust it.');
           setIsLocating(false);
         },
         (err) => {
-          console.warn('Geolocation access failed or denied:', err.message);
+          setLocSuccessMsg('Location unavailable. Please select the incident on the map.');
           setIsLocating(false);
         },
         { enableHighAccuracy: true, timeout: 10000 },
@@ -60,6 +58,7 @@ export default function ReportIncidentPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setError(null);
     setFieldErrors({});
 
@@ -93,8 +92,8 @@ export default function ReportIncidentPage() {
       addError('description', 'Title and description cannot be identical.');
     }
 
-    if (latitude === '') addError('location', 'Latitude is required (click Detect My Location).');
-    if (longitude === '') addError('location', 'Longitude is required (click Detect My Location).');
+    if (latitude === '') addError('location', 'Select the incident location on the map.');
+    if (longitude === '') addError('location', 'Select the incident location on the map.');
     if (latitude !== '' && (Number.isNaN(lat) || lat < -90 || lat > 90)) {
       addError('location', 'Latitude must be between -90 and 90.');
     }
@@ -124,7 +123,7 @@ export default function ReportIncidentPage() {
           address: cleanAddress || undefined,
         },
       });
-      router.push('/incidents/my');
+      router.push('/dashboard');
     } catch (err: unknown) {
       const axiosErr = err as {
         response?: { data?: { message?: string; errors?: Record<string, string[]> } };
@@ -149,7 +148,7 @@ export default function ReportIncidentPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Report Incident</h1>
           <p className="text-slate-400 text-sm">
-            Submit an emergency report for authority review & AI priority assessment
+            Submit an emergency report for authority review
           </p>
         </div>
       </div>
@@ -157,10 +156,10 @@ export default function ReportIncidentPage() {
       <Card>
         <div className="mb-5 p-3 bg-slate-900/90 rounded-xl border border-slate-700/80 flex items-center gap-2.5 text-xs text-slate-300">
           <span className="p-1 bg-emerald-500/10 text-emerald-400 rounded-lg shrink-0 font-bold flex items-center gap-1">
-            <ShieldCheck size={14} /> Automated Verification Active
+            <ShieldCheck size={14} /> Authority approval required
           </span>
           <p className="text-[11px] text-slate-400">
-            Reports are verified for text structure. Inputs containing random digits (e.g. 12312 41jk23), keyboard mash, or XSS payloads will be rejected.
+            Reports become visible to the community only after approval. Limit: 5 reports per day, resetting at midnight India time.
           </p>
         </div>
 
@@ -239,7 +238,7 @@ export default function ReportIncidentPage() {
 
             <div>
               <label htmlFor="severity" className={labelClass}>
-                Initial Perceived Priority <span className="text-orange-400">*</span>
+                Severity <span className="text-orange-400">*</span>
               </label>
               <select
                 id="severity"
@@ -260,7 +259,7 @@ export default function ReportIncidentPage() {
             <div className="flex items-center justify-between gap-2 mb-3 mt-4">
               <div className="flex items-center gap-2">
                 <MapPin size={16} className="text-orange-400" />
-                <p className="text-sm font-medium text-slate-200">Location Coordinates <span className="text-orange-400">*</span></p>
+                <p className="text-sm font-medium text-slate-200">Select location on map <span className="text-orange-400">*</span></p>
               </div>
 
               <Button
@@ -282,39 +281,11 @@ export default function ReportIncidentPage() {
 
             {fieldErrors.location && <p className="text-xs text-red-400 mb-3">{fieldErrors.location[0]}</p>}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label htmlFor="latitude" className={labelClass}>
-                  Latitude <span className="text-orange-400">*</span>
-                </label>
-                <input
-                  id="latitude"
-                  type="number"
-                  step="any"
-                  required
-                  value={latitude}
-                  onChange={(e) => setLatitude(e.target.value)}
-                  placeholder="Click Detect My Location"
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <label htmlFor="longitude" className={labelClass}>
-                  Longitude <span className="text-orange-400">*</span>
-                </label>
-                <input
-                  id="longitude"
-                  type="number"
-                  step="any"
-                  required
-                  value={longitude}
-                  onChange={(e) => setLongitude(e.target.value)}
-                  placeholder="Click Detect My Location"
-                  className={inputClass}
-                />
-              </div>
-            </div>
-
+            <p className="text-xs text-slate-400 mb-3">Click or tap the map to place the incident marker.</p>
+            <div className="mb-4"><LocationPicker
+              value={latitude !== '' && longitude !== '' ? [Number(latitude), Number(longitude)] : null}
+              onChange={([lat, lng]) => { setLatitude(String(lat)); setLongitude(String(lng)); setLocSuccessMsg('Incident location selected.'); }}
+            /></div>
             <div>
               <div className="flex justify-between items-center mb-1.5">
                 <label htmlFor="address" className={labelClass}>

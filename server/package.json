@@ -7,7 +7,8 @@
     "dev": "nodemon",
     "build": "rimraf dist && tsc",
     "start": "node dist/index.js",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "test": "node -r ts-node/register/transpile-only --test tests/*.test.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -18,7 +19,6 @@
     "mongoose": "^8.4.0",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
-    "openai": "^7.8.0",
     "socket.io": "^4.7.5",
     "zod": "^3.23.8"
   },

@@ -14,6 +14,7 @@ import { AuthRequest } from '../middleware/authMiddleware';
  * @access  Authenticated
  */
 export const getOverviewStats = asyncHandler(async (_req: AuthRequest, res: Response) => {
+  const visibility = ['authority', 'admin'].includes(_req.user?.role ?? '') ? {} : { approvalStatus: 'APPROVED' };
   const [
     totalIncidents,
     activeIncidents,
@@ -26,13 +27,13 @@ export const getOverviewStats = asyncHandler(async (_req: AuthRequest, res: Resp
     totalVolunteers,
     activeAssignments,
   ] = await Promise.all([
-    Incident.countDocuments(),
-    Incident.countDocuments({ status: { $in: ['REPORTED', 'UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS'] } }),
-    Incident.countDocuments({ severity: 'CRITICAL', status: { $ne: 'CLOSED' } }),
-    Incident.countDocuments({ status: { $in: ['RESOLVED', 'CLOSED'] } }),
-    Shelter.countDocuments({ status: 'ACTIVE' }),
+    Incident.countDocuments(visibility),
+    Incident.countDocuments({ ...visibility, status: { $in: ['REPORTED', 'UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS'] } }),
+    Incident.countDocuments({ ...visibility, severity: 'CRITICAL', status: { $ne: 'CLOSED' } }),
+    Incident.countDocuments({ ...visibility, status: { $in: ['RESOLVED', 'CLOSED'] } }),
+    Shelter.countDocuments({ status: { $in: ['ACTIVE', 'FULL'] } }),
     Shelter.aggregate([
-      { $match: { status: 'ACTIVE' } },
+      { $match: { status: { $in: ['ACTIVE', 'FULL'] } } },
       {
         $group: {
           _id: null,

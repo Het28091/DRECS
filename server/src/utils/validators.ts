@@ -162,28 +162,13 @@ export const updateAssignmentStatusSchema = z.object({
 // ─── Volunteer Request Validation Schemas ─────────────────────────────────────
 
 export const createVolunteerRequestSchema = z.object({
-  skills: z.array(z.string().trim().min(1).max(80).transform(sanitizeInputText)).optional().default([]),
-  experience: z
-    .string()
-    .trim()
-    .max(2000, 'Experience must be at most 2000 characters')
-    .transform(sanitizeInputText)
-    .optional()
-    .default(''),
-  message: z
-    .string()
-    .trim()
-    .max(1000, 'Message must be at most 1000 characters')
-    .transform(sanitizeInputText)
-    .optional()
-    .default(''),
-  phoneNumber: z
-    .string()
-    .trim()
-    .max(20, 'Phone number must be at most 20 characters')
-    .transform(sanitizeInputText)
-    .optional()
-    .default(''),
+  skills: z.array(z.string().trim().transform(sanitizeInputText).pipe(z.string().min(2).max(80))).min(1, 'Enter at least one skill').max(10, 'Enter at most 10 skills'),
+  experience: z.string().trim().transform(sanitizeInputText).pipe(z.string().min(10, 'Describe your experience in at least 10 characters').max(2000)),
+  message: z.string().trim().transform(sanitizeInputText).pipe(z.string().min(10, 'Describe how you can help in at least 10 characters').max(1000)),
+  phoneNumber: z.string().trim().regex(/^\+?[0-9 ()-]{10,20}$/, 'Enter a valid phone number').refine(value => {
+    const digits = value.replace(/\D/g, '');
+    return digits.length >= 10 && digits.length <= 15 && !/^(.)\1+$/.test(digits);
+  }, 'Enter a valid phone number with 10 to 15 digits'),
 });
 
 export const reviewVolunteerRequestSchema = z.object({

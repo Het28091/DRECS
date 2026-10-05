@@ -65,15 +65,13 @@ export interface StatusHistoryEntry {
 }
 
 export interface Incident {
+  approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
+  allowedTransitions?: IncidentStatus[];
   id: string;
   title: string;
   description: string;
   category: string;
   severity: IncidentSeverity;
-  userSeverity?: IncidentSeverity;
-  aiSeverity?: IncidentSeverity;
-  aiSeverityMatch?: boolean;
-  aiReasoning?: string;
   location: Location;
   images: string[];
   status: IncidentStatus;
@@ -289,6 +287,7 @@ export interface NotificationsResponse {
 export type VolunteerRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface VolunteerRequest {
+  canApprove?: boolean;
   id: string;
   userId: IncidentReporter | string;
   incidentId: AssignmentIncidentSummary | string;

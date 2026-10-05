@@ -88,7 +88,7 @@ export const createShelter = asyncHandler(async (req: AuthRequest, res: Response
     currentOccupancy,
     facilities,
     contactInfo,
-    status,
+    status: status === 'INACTIVE' ? 'INACTIVE' : currentOccupancy >= capacity ? 'FULL' : 'ACTIVE',
   });
 
   res.status(201).json({

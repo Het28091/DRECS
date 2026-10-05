@@ -1,5 +1,6 @@
 import { Server as HttpServer } from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
+import { verifyAccessToken } from '../utils/jwt';
 import { env } from '../config/env';
 import { Notification, NotificationType } from '../models/Notification';
 import { User } from '../models/User';
@@ -15,19 +16,22 @@ export const initSocket = (httpServer: HttpServer): SocketIOServer => {
     },
   });
 
+  io.use(async (socket, next) => {
+    try {
+      const payload = verifyAccessToken(socket.handshake.auth.token);
+      const user = await User.findById(payload.id).select('role isActive');
+      if (!user?.isActive) return next(new Error('Unauthorized'));
+      socket.data.userId = user._id.toString();
+      socket.data.role = user.role;
+      next();
+    } catch { next(new Error('Unauthorized')); }
+  });
   io.on('connection', (socket: Socket) => {
     console.log(`🔌 Socket connected: ${socket.id}`);
 
-    socket.on('join_room', (data: { userId?: string; role?: string }) => {
-      if (data.userId) {
-        socket.join(`user:${data.userId}`);
-        console.log(`👤 Socket ${socket.id} joined user:${data.userId}`);
-      }
-      if (data.role) {
-        socket.join(`role:${data.role}`);
-        console.log(`🛡️ Socket ${socket.id} joined role:${data.role}`);
-      }
-    });
+    socket.join('authenticated');
+    socket.join(`user:${socket.data.userId}`);
+    socket.join(`role:${socket.data.role}`);
 
     socket.on('disconnect', (reason: string) => {
       console.log(`🔌 Socket disconnected: ${socket.id} (${reason})`);

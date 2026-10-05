@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getSocket } from '@/lib/socket';
 import { useAuth } from '@/hooks/useAuth';
 import { fetchMyVolunteerAccess } from '@/lib/assignments';
 
@@ -59,9 +60,14 @@ export function useVolunteerCapability() {
     };
 
     load();
+    const interval = setInterval(load, 30000);
+    const socket = getSocket();
+    socket.on('data_changed', load);
 
     return () => {
       cancelled = true;
+      clearInterval(interval);
+      socket.off('data_changed', load);
     };
   }, [isAuthenticated, user]);
 

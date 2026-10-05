@@ -1,4 +1,5 @@
 'use client';
+import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
 import { useCallback, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
@@ -44,9 +45,8 @@ export default function MapPage() {
   const [error, setError] = useState<string | null>(null);
   const [fitToken, setFitToken] = useState(0);
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setIsLoading(true); setError(null); }
     try {
       const [incidentData, shelterData] = await Promise.all([
         fetchMapIncidents(),
@@ -66,6 +66,8 @@ export default function MapPage() {
       setIsLoading(false);
     }
   }, []);
+
+  useLiveRefresh(() => load(true), true);
 
   useEffect(() => {
     load();
@@ -99,7 +101,7 @@ export default function MapPage() {
             <LocateFixed size={14} />
             Center on markers
           </Button>
-          <Button variant="outline" size="sm" onClick={load} loading={isLoading}>
+          <Button variant="outline" size="sm" onClick={() => load()} loading={isLoading}>
             <RefreshCw size={14} />
             Refresh
           </Button>

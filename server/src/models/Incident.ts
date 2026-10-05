@@ -42,14 +42,13 @@ export interface IStatusHistoryEntry {
 }
 
 export interface IIncident {
+  approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewedBy?: Types.ObjectId;
+  reviewedAt?: Date;
   title: string;
   description: string;
   category: IncidentCategory;
   severity: IncidentSeverity;
-  userSeverity?: IncidentSeverity;
-  aiSeverity?: IncidentSeverity;
-  aiSeverityMatch?: boolean;
-  aiReasoning?: string;
   location: IIncidentLocation;
   images: string[];
   status: IncidentStatus;
@@ -116,6 +115,9 @@ const statusHistorySchema = new Schema<IStatusHistoryEntry>(
 
 const incidentSchema = new Schema<IIncidentDocument>(
   {
+    approvalStatus: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'PENDING', index: true },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    reviewedAt: Date,
     title: {
       type: String,
       required: [true, 'Title is required'],
@@ -147,22 +149,6 @@ const incidentSchema = new Schema<IIncidentDocument>(
       required: [true, 'Severity is required'],
       default: 'MEDIUM',
     },
-    userSeverity: {
-      type: String,
-      enum: [...INCIDENT_SEVERITIES],
-    },
-    aiSeverity: {
-      type: String,
-      enum: [...INCIDENT_SEVERITIES],
-    },
-    aiSeverityMatch: {
-      type: Boolean,
-      default: false,
-    },
-    aiReasoning: {
-      type: String,
-      default: '',
-    },
     location: {
       type: incidentLocationSchema,
       required: [true, 'Location is required'],
@@ -192,6 +178,7 @@ const incidentSchema = new Schema<IIncidentDocument>(
   },
   {
     timestamps: true,
+    optimisticConcurrency: true,
   },
 );
 

@@ -1,12 +1,14 @@
+import { canOfferHelp } from '../utils/incidentPolicy';
 import { Response } from 'express';
 import { Types } from 'mongoose';
 import { Assignment, ASSIGNMENT_STATUSES, IAssignmentDocument } from '../models/Assignment';
 import { Incident } from '../models/Incident';
+import { VolunteerRequest } from '../models/VolunteerRequest';
 import { User } from '../models/User';
 import { asyncHandler } from '../utils/asyncHandler';
 import { createError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/authMiddleware';
-import { dispatchNotificationToRoles } from '../socket';
+import { dispatchNotification, dispatchNotificationToRoles } from '../socket';
 
 const formatUser = (value: unknown) => {
   const ref = value as
@@ -108,6 +110,7 @@ export const assignVolunteerToIncident = asyncHandler(
       throw createError('Incident not found', 404);
     }
 
+    if (!canOfferHelp(incident)) throw createError('Only approved, active incidents can receive assignments', 400);
     const volunteer = await User.findById(volunteerId);
     if (!volunteer) {
       throw createError('User not found', 400);
@@ -140,6 +143,7 @@ export const assignVolunteerToIncident = asyncHandler(
       await incident.save();
     }
 
+    await dispatchNotification({ recipientId: volunteerId, title: 'New assignment', message: `You have been assigned to "${incident.title}".`, type: 'ASSIGNMENT_UPDATE', link: '/volunteers/tasks' });
     await populateAssignment(assignment);
 
     res.status(201).json({
@@ -194,12 +198,12 @@ export const getMyAssignments = asyncHandler(async (req: AuthRequest, res: Respo
   const assignments = await Assignment.find({ volunteerId: req.user.id })
     .sort({ assignedAt: -1 })
     .populate('volunteerId', 'name email role')
-    .populate('incidentId', 'title category severity status location description');
+    .populate({ path: 'incidentId', select: 'title category severity status location description', match: { approvalStatus: 'APPROVED' } });
 
   res.status(200).json({
     success: true,
-    count: assignments.length,
-    assignments: assignments.map(formatAssignment),
+    count: assignments.filter(a => a.incidentId).length,
+    assignments: assignments.filter(a => a.incidentId).map(formatAssignment),
   });
 });
 
@@ -266,6 +270,9 @@ export const updateAssignmentStatus = asyncHandler(
       throw createError('Forbidden — You can only update your own assignments', 403);
     }
 
+    const incident = await Incident.findById(assignment.incidentId);
+    if (!incident || !canOfferHelp(incident)) throw createError('This incident is no longer active or approved', 400);
+
     // Enforce sequential lifecycle: ASSIGNED -> ACCEPTED -> IN_PROGRESS -> COMPLETED
     const SEQUENCE: Record<string, string[]> = {
       ASSIGNED: ['ACCEPTED'],
@@ -291,6 +298,12 @@ export const updateAssignmentStatus = asyncHandler(
     }
 
     await assignment.save();
+    if (status === 'IN_PROGRESS' && incident.status === 'ASSIGNED') {
+      await Incident.findOneAndUpdate({ _id: incident._id, status: 'ASSIGNED' }, {
+        $set: { status: 'IN_PROGRESS' }, $inc: { __v: 1 },
+        $push: { statusHistory: { status: 'IN_PROGRESS', changedBy: new Types.ObjectId(req.user.id), changedAt: new Date(), note: 'Responder started work' } },
+      });
+    }
     await populateAssignment(assignment);
 
     // Notify authorities about responder status updates
@@ -338,13 +351,26 @@ export const removeAssignment = asyncHandler(
       throw createError('Invalid assignment ID', 400);
     }
 
-    const assignment = await Assignment.findById(req.params.id);
-    if (!assignment) {
-      throw createError('Assignment not found', 404);
-    }
+    const assignment = await Assignment.db.transaction(async session => {
+      const assignment = await Assignment.findById(req.params.id).session(session);
+      if (!assignment) throw createError('Assignment not found', 404);
+      if (assignment.status === 'COMPLETED') throw createError('Completed assignments are retained as history', 400);
+      const incident = await Incident.findById(assignment.incidentId).session(session);
+      await assignment.deleteOne({ session });
+      if (assignment.volunteerRequestId) {
+        await VolunteerRequest.updateOne({ _id: assignment.volunteerRequestId }, {
+          $set: { status: 'REJECTED', reviewedBy: req.user!.id, reviewedAt: new Date() },
+        }, { session });
+      }
+      if (incident?.status === 'ASSIGNED' && !await Assignment.exists({ incidentId: incident._id, status: { $ne: 'COMPLETED' } }).session(session)) {
+        incident.status = 'UNDER_REVIEW';
+        incident.statusHistory.push({ status: 'UNDER_REVIEW', changedBy: new Types.ObjectId(req.user!.id), changedAt: new Date(), note: 'All pending assignments removed; awaiting response team' });
+        await incident.save({ session });
+      }
+      return assignment;
+    });
 
-    await assignment.deleteOne();
-
+    await dispatchNotification({ recipientId: assignment.volunteerId.toString(), title: 'Assignment removed', message: 'An authority removed your active assignment.', type: 'ASSIGNMENT_UPDATE', link: '/volunteers/tasks' });
     res.status(200).json({
       success: true,
       message: 'Assignment removed successfully',

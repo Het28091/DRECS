@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { NotificationMenu } from './NotificationMenu';
 import { useRouter } from 'next/navigation';
-import { Bell, Shield, LogOut, User } from 'lucide-react';
+import { Shield, LogOut, User } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 /**
@@ -33,13 +34,7 @@ export function Navbar() {
 
       {/* Right controls */}
       <div className="flex items-center gap-2 text-xs">
-        <Link
-          href="/notifications"
-          aria-label="Notifications"
-          className="relative p-1.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors"
-        >
-          <Bell size={16} />
-        </Link>
+        <NotificationMenu />
 
         <div className="h-4 w-px bg-slate-700 mx-1" />
 

@@ -5,7 +5,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { createError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/authMiddleware';
 
-import { validatePasswordSecurity } from '../utils/securityVerifier';
+import { validatePasswordSecurity } from '../utils/passwordSecurity';
 
 /**
  * @desc    Register a new user

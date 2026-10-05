@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
-  AlertTriangle,
   Map,
   Home,
   Users,
@@ -31,7 +30,6 @@ interface NavItem {
 const BASE_NAV: Record<Role, NavItem[]> = {
   citizen: [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/incidents', label: 'Incidents', icon: AlertTriangle },
     { href: '/incidents/report', label: 'Report Incident', icon: PlusCircle },
     { href: '/map', label: 'Map View', icon: Map },
     { href: '/shelters', label: 'Shelters', icon: Home },
@@ -41,7 +39,6 @@ const BASE_NAV: Record<Role, NavItem[]> = {
   volunteer: [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/volunteers/tasks', label: 'Assigned Tasks', icon: ClipboardList },
-    { href: '/incidents', label: 'Incidents', icon: AlertTriangle },
     { href: '/incidents/report', label: 'Report Incident', icon: PlusCircle },
     { href: '/map', label: 'Map View', icon: Map },
     { href: '/shelters', label: 'Shelters', icon: Home },
@@ -50,7 +47,6 @@ const BASE_NAV: Record<Role, NavItem[]> = {
   ],
   authority: [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/incidents', label: 'Incident Control', icon: AlertTriangle },
     { href: '/volunteer-requests', label: 'Volunteer Requests', icon: Handshake },
     { href: '/volunteers', label: 'Volunteer Force', icon: Users },
     { href: '/shelters', label: 'Shelter Management', icon: Home },
@@ -61,7 +57,6 @@ const BASE_NAV: Record<Role, NavItem[]> = {
   ],
   admin: [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/incidents', label: 'Incidents Control', icon: AlertTriangle },
     { href: '/volunteer-requests', label: 'Volunteer Requests', icon: Handshake },
     { href: '/volunteers', label: 'Volunteer Force', icon: Users },
     { href: '/shelters', label: 'Shelter Management', icon: Home },
@@ -142,15 +137,6 @@ export function Sidebar() {
         )}
       </nav>
 
-      <div className="p-3 border-t border-slate-800 bg-slate-950/50 flex items-center justify-between text-xs">
-        <div>
-          <p className="text-xs text-slate-200 font-bold truncate max-w-[120px]">{user.name}</p>
-          <p className="text-[10px] text-amber-400 font-mono uppercase">{user.role}</p>
-        </div>
-        <span className="text-[10px] text-slate-400 font-mono bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">
-          STABLE
-        </span>
-      </div>
     </aside>
   );
 }

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   createIncident,
+  reviewIncident,
   getMyIncidents,
   getAllIncidents,
   getPublicIncidents,
@@ -15,6 +16,7 @@ import { authenticate } from '../middleware/authMiddleware';
 import { roleGuard } from '../middleware/roleGuard';
 import {
   validateBody,
+  reviewVolunteerRequestSchema,
   createIncidentSchema,
   updateIncidentStatusSchema,
   createVolunteerRequestSchema,
@@ -47,7 +49,7 @@ router.get(
 router.post(
   '/:id/volunteer-request',
   authenticate,
-  roleGuard('citizen'),
+  roleGuard('citizen', 'volunteer'),
   validateBody(createVolunteerRequestSchema),
   createVolunteerRequest,
 );
@@ -73,6 +75,8 @@ router.patch(
   validateBody(updateIncidentStatusSchema),
   updateIncidentStatus,
 );
+
+router.patch('/:id/review', authenticate, roleGuard('authority', 'admin'), validateBody(reviewVolunteerRequestSchema), reviewIncident);
 
 router.get('/:id', authenticate, getIncidentById);
 

@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 export type UserRole = 'citizen' | 'volunteer' | 'authority' | 'admin';
 
 export interface IUser {
+  incidentReportDay?: string;
+  incidentReportCount?: number;
   name: string;
   email: string;
   password?: string;
@@ -23,6 +25,8 @@ export type IUserModel = Model<IUserDocument, {}, IUserMethods>;
 
 const userSchema = new Schema<IUserDocument, IUserModel, IUserMethods>(
   {
+    incidentReportDay: { type: String, select: false },
+    incidentReportCount: { type: Number, default: 0, select: false },
     name: {
       type: String,
       required: [true, 'Name is required'],

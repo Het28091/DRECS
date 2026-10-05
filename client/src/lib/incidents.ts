@@ -64,3 +64,8 @@ export async function updateIncidentStatus(
   });
   return response.data.incident;
 }
+
+export async function reviewIncident(id: string, status: 'APPROVED' | 'REJECTED'): Promise<Incident> {
+  const response = await api.patch<IncidentResponse>(`/incidents/${id}/review`, { status });
+  return response.data.incident;
+}

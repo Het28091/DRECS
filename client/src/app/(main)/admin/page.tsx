@@ -1,4 +1,5 @@
 'use client';
+import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -34,8 +35,8 @@ export default function AdminPage() {
     }
   }, [currentUser, isAuthLoading, router]);
 
-  const fetchUsers = useCallback(async () => {
-    setLoading(true);
+  const fetchUsers = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await getAllUsers({
         role: roleFilter || undefined,
@@ -58,6 +59,8 @@ export default function AdminPage() {
       console.error('Failed to load system overview', err);
     }
   }, []);
+
+  useLiveRefresh(async () => { await Promise.all([fetchUsers(true), fetchOverview()]); }, currentUser?.role === 'admin');
 
   useEffect(() => {
     if (currentUser?.role === 'admin') {

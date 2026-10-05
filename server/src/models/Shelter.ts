@@ -91,6 +91,7 @@ const shelterSchema = new Schema<IShelterDocument>(
   },
   {
     timestamps: true,
+    optimisticConcurrency: true,
   },
 );
 

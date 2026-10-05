@@ -1,4 +1,7 @@
 import { Response } from 'express';
+import { INCIDENT_TRANSITIONS, incidentReportDay, DAILY_INCIDENT_LIMIT } from '../utils/incidentPolicy';
+import { User } from '../models/User';
+
 import { Types } from 'mongoose';
 import { Incident, INCIDENT_STATUSES, IIncidentDocument } from '../models/Incident';
 import { Assignment } from '../models/Assignment';
@@ -7,19 +10,27 @@ import { createError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/authMiddleware';
 import { dispatchNotification, dispatchNotificationToRoles } from '../socket';
 
-/**
- * Allowed incident status transitions.
- * CLOSED is a terminal state — no transitions out. No other status may jump
- * forward (e.g. REPORTED -> RESOLVED is rejected).
- */
-export const INCIDENT_TRANSITIONS: Record<string, string[]> = {
-  REPORTED: ['UNDER_REVIEW', 'ASSIGNED'],
-  UNDER_REVIEW: ['ASSIGNED', 'IN_PROGRESS'],
-  ASSIGNED: ['IN_PROGRESS', 'RESOLVED'],
-  IN_PROGRESS: ['RESOLVED'],
-  RESOLVED: ['CLOSED'],
-  CLOSED: [],
-};
+export const reviewIncident = asyncHandler(async (req: AuthRequest, res: Response) => {
+  if (!Types.ObjectId.isValid(req.params.id)) throw createError('Invalid incident ID', 400);
+  const incident = await Incident.findById(req.params.id);
+  if (!incident) throw createError('Incident not found', 404);
+  if (incident.approvalStatus !== 'PENDING') throw createError('This report has already been reviewed', 409);
+  incident.approvalStatus = req.body.status;
+  incident.reviewedBy = new Types.ObjectId(req.user!.id);
+  incident.reviewedAt = new Date();
+  if (incident.approvalStatus === 'APPROVED' && incident.status === 'REPORTED') incident.status = 'UNDER_REVIEW';
+  incident.statusHistory.push({
+    status: incident.status, changedBy: incident.reviewedBy, changedAt: incident.reviewedAt,
+    note: incident.approvalStatus === 'APPROVED' ? 'Report approved for public visibility' : 'Report rejected by authority',
+  });
+  await incident.save();
+  await dispatchNotification({ recipientId: incident.reportedBy.toString(), title: 'Report reviewed',
+    message: `Your report "${incident.title}" was ${incident.approvalStatus.toLowerCase()}.`,
+    type: 'INCIDENT_UPDATE', link: `/incidents/${incident._id}` });
+  await populateIncidentRelations(incident);
+  res.json({ success: true, incident: formatIncident(incident, { includeInternal: true }) });
+});
+
 
 interface FormatOptions {
   /** When true, include who changed each status (authority/admin only). */
@@ -75,14 +86,15 @@ const formatIncident = (incident: IIncidentDocument, options: FormatOptions = {}
     description: incident.description,
     category: incident.category,
     severity: incident.severity,
-    userSeverity: incident.userSeverity ?? incident.severity,
-    aiSeverity: incident.aiSeverity ?? incident.severity,
-    aiSeverityMatch: incident.aiSeverityMatch ?? true,
-    aiReasoning: incident.aiReasoning ?? '',
+    approvalStatus: incident.approvalStatus ?? 'PENDING',
+    allowedTransitions: incident.approvalStatus === 'APPROVED' ? INCIDENT_TRANSITIONS[incident.status] ?? [] : [],
     location: incident.location,
     images: incident.images ?? [],
     status: incident.status,
-    reportedBy: formatUserRef(incident.reportedBy),
+    reportedBy: includeInternal ? formatUserRef(incident.reportedBy) : (() => {
+      const ref = formatUserRef(incident.reportedBy);
+      return typeof ref === 'object' ? { id: ref.id, name: ref.name } : ref;
+    })(),
     statusHistory,
     createdAt: incident.createdAt,
     updatedAt: incident.updatedAt,
@@ -97,8 +109,6 @@ const populateIncidentRelations = async (incident: IIncidentDocument) => {
   return incident;
 };
 
-import { verifyIncidentContent } from '../utils/securityVerifier';
-import { verifyWithOpenAI } from '../utils/openAiVerifier';
 
 /**
  * @desc    Create a new incident report
@@ -112,50 +122,48 @@ export const createIncident = asyncHandler(async (req: AuthRequest, res: Respons
 
   const { title, description, category, severity, location, images } = req.body;
 
-  // 1. Local Automated Content Verification & Moderation
-  const verification = verifyIncidentContent(title, description);
-  if (!verification.isValid) {
-    throw createError(verification.reason || 'Incident content verification failed.', 400);
-  }
-
-  // 2. OpenAI Lore-Accurate Verification & Priority Arbitration
-  const userSubmittedSeverity = severity || 'MEDIUM';
-  const openAiCheck = await verifyWithOpenAI({
-    title,
-    description,
-    category,
-    userSeverity: userSubmittedSeverity,
-    location,
-  });
-
-  if (!openAiCheck.isValid) {
-    throw createError(openAiCheck.reason || 'Incident verification failed.', 400);
-  }
-
+  const day = incidentReportDay();
+  // Include reports made before the daily counter was introduced.
+  const submittedToday = await Incident.countDocuments({ reportedBy: req.user.id, createdAt: { $gte: new Date(`${day}T00:00:00+05:30`) } });
+  if (submittedToday >= DAILY_INCIDENT_LIMIT) throw createError('Daily limit reached: you may submit 5 incident reports per day. Resets at midnight India time.', 429);
+  const reserved = await User.findOneAndUpdate({
+    _id: req.user.id,
+    $or: [{ incidentReportDay: { $ne: day } }, { incidentReportCount: { $lt: DAILY_INCIDENT_LIMIT } }],
+  }, [{ $set: {
+    incidentReportDay: day,
+    incidentReportCount: { $cond: [
+      { $eq: ['$incidentReportDay', day] },
+      { $add: [{ $ifNull: ['$incidentReportCount', 0] }, 1] }, submittedToday + 1,
+    ] },
+  } }]);
+  if (!reserved) throw createError('Daily limit reached: you may submit 5 incident reports per day. Resets at midnight India time.', 429);
   const now = new Date();
 
-  const incident = await Incident.create({
-    title,
-    description,
-    category,
-    severity: openAiCheck.finalSeverity,
-    userSeverity: userSubmittedSeverity,
-    aiSeverity: openAiCheck.aiSeverity,
-    aiSeverityMatch: openAiCheck.aiSeverityMatch,
-    aiReasoning: openAiCheck.reason,
-    location,
-    images: images ?? [],
-    status: 'REPORTED',
-    reportedBy: req.user.id,
-    statusHistory: [
-      {
-        status: 'REPORTED',
-        changedBy: req.user.id,
-        changedAt: now,
-      },
-    ],
-  });
+  let incident: IIncidentDocument;
+  try {
+    incident = await Incident.create({
+      title,
+      description,
+      category,
+      severity,
+      approvalStatus: 'PENDING',
+      location,
+      images: images ?? [],
+      status: 'REPORTED',
+      reportedBy: req.user.id,
+      statusHistory: [
+        {
+          status: 'REPORTED',
+          changedBy: req.user.id,
+          changedAt: now,
+        },
+      ],
+    });
 
+  } catch (error) {
+    await User.updateOne({ _id: req.user.id, incidentReportDay: day, incidentReportCount: { $gt: 0 } }, { $inc: { incidentReportCount: -1 } });
+    throw error;
+  }
   await populateIncidentRelations(incident);
 
   // Notify Authorities & Admins about new incident
@@ -169,7 +177,7 @@ export const createIncident = asyncHandler(async (req: AuthRequest, res: Respons
 
   res.status(201).json({
     success: true,
-    message: 'Incident reported successfully',
+    message: 'Report submitted for authority approval',
     incident: formatIncident(incident, { includeInternal: false }),
   });
 });
@@ -231,7 +239,7 @@ export const getAllIncidents = asyncHandler(async (req: AuthRequest, res: Respon
  */
 export const getPublicIncidents = asyncHandler(
   async (req: AuthRequest, res: Response) => {
-    const filter: Record<string, string> = {};
+    const filter: Record<string, string> = { approvalStatus: 'APPROVED' };
 
     if (typeof req.query.status === 'string' && req.query.status) {
       filter.status = req.query.status;
@@ -267,12 +275,17 @@ export const getIncidentById = asyncHandler(async (req: AuthRequest, res: Respon
     throw createError('Unauthorized — Authentication required', 401);
   }
 
+  if (!Types.ObjectId.isValid(req.params.id)) throw createError('Invalid incident ID', 400);
   const incident = await Incident.findById(req.params.id);
 
   if (!incident) {
     throw createError('Incident not found', 404);
   }
 
+  if (incident.approvalStatus !== 'APPROVED' &&
+      !['authority', 'admin'].includes(req.user.role) && incident.reportedBy.toString() !== req.user.id) {
+    throw createError('Incident not found', 404);
+  }
   await populateIncidentRelations(incident);
 
   const isAuthority = req.user.role === 'authority' || req.user.role === 'admin';
@@ -305,6 +318,8 @@ export const updateIncidentStatus = asyncHandler(async (req: AuthRequest, res: R
     throw createError('Incident not found', 404);
   }
 
+  if (incident.approvalStatus !== 'APPROVED') throw createError('Approve the report before changing its response status', 400);
+
   if (incident.status === status) {
     throw createError(`Incident is already ${status.replace(/_/g, ' ')}`, 400);
   }
@@ -332,6 +347,9 @@ export const updateIncidentStatus = asyncHandler(async (req: AuthRequest, res: R
     }
   }
 
+  if (['RESOLVED', 'CLOSED'].includes(status) && await Assignment.exists({ incidentId: incident._id, status: { $ne: 'COMPLETED' } })) {
+    throw createError('Complete or remove active assignments before resolving the incident', 400);
+  }
   incident.status = status;
   incident.statusHistory.push({
     status,

@@ -1,4 +1,5 @@
 'use client';
+import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -78,9 +79,8 @@ export default function VolunteerRequestsPage() {
     }
   }, [user, isAuthLoading, router]);
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setIsLoading(true); setError(null); }
     try {
       const data = await fetchAllVolunteerRequests(
         statusFilter as VolunteerRequestStatus | undefined,
@@ -97,6 +97,8 @@ export default function VolunteerRequestsPage() {
       setIsLoading(false);
     }
   }, [statusFilter]);
+
+  useLiveRefresh(() => load(true), user?.role === 'authority' || user?.role === 'admin');
 
   useEffect(() => {
     if (isAuthLoading) return;
@@ -259,7 +261,8 @@ export default function VolunteerRequestsPage() {
                         variant="primary"
                         size="sm"
                         loading={reviewingId === request.id}
-                        onClick={() => handleReview(request.id, 'APPROVED')}
+                        disabled={request.canApprove === false}
+                            onClick={() => handleReview(request.id, 'APPROVED')}
                       >
                         <CheckCircle2 size={14} />
                         Approve

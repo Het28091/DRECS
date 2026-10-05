@@ -5,7 +5,7 @@ import { env } from './config/env';
 import { connectDB } from './config/db';
 import { requestLogger } from './middleware/requestLogger';
 import { errorHandler } from './middleware/errorHandler';
-import { initSocket } from './socket';
+import { initSocket, getIO } from './socket';
 import { apiRoutes } from './routes';
 
 const app = express();
@@ -37,7 +37,15 @@ app.get('/health', (_req, res) => {
 });
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
-app.use('/api', apiRoutes);
+app.use('/api', (req, res, next) => {
+  res.on('finish', () => {
+    if ((req as import('./middleware/authMiddleware').AuthRequest).user && ['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method) && res.statusCode < 400) {
+      // Invalidation only: each client re-fetches through its authorized API.
+      getIO()?.to('authenticated').emit('data_changed');
+    }
+  });
+  next();
+}, apiRoutes);
 
 // ─── 404 Handler ─────────────────────────────────────────────────────────────
 app.use((_req, res) => {

@@ -1,4 +1,5 @@
 'use client';
+import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import {
@@ -63,9 +64,8 @@ export default function SheltersPage() {
   const [contactInfo, setContactInfo] = useState('');
   const [status, setStatus] = useState<ShelterStatus>('ACTIVE');
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setIsLoading(true); setError(null); }
     try {
       const data = await fetchShelters();
       setShelters(data);
@@ -80,6 +80,8 @@ export default function SheltersPage() {
       setIsLoading(false);
     }
   }, []);
+
+  useLiveRefresh(() => load(true), Boolean(user));
 
   useEffect(() => {
     load();
@@ -110,7 +112,7 @@ export default function SheltersPage() {
     setOccupancy(String(shelter.currentOccupancy));
     setFacilities(shelter.facilities.join(', '));
     setContactInfo(shelter.contactInfo);
-    setStatus(shelter.status);
+    setStatus(shelter.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE');
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -173,24 +175,6 @@ export default function SheltersPage() {
       );
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleQuickUpdate = async (
-    id: string,
-    data: { currentOccupancy?: number; status?: ShelterStatus; capacity?: number },
-  ) => {
-    setError(null);
-    try {
-      const updated = await updateShelter(id, data);
-      setShelters((prev) => prev.map((s) => (s.id === id ? updated : s)));
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
-      setError(
-        axiosErr.response?.data?.message ||
-          axiosErr.message ||
-          'Failed to update shelter.',
-      );
     }
   };
 
@@ -375,12 +359,13 @@ export default function SheltersPage() {
                   onChange={(e) => setStatus(e.target.value as ShelterStatus)}
                   className={inputClass}
                 >
-                  {SHELTER_STATUSES.map((s) => (
+                  {SHELTER_STATUSES.filter(s => s !== 'FULL').map((s) => (
                     <option key={s} value={s}>
                       {s}
                     </option>
                   ))}
                 </select>
+                <p className="text-xs text-slate-500 mt-1">Active shelters become full automatically when occupancy reaches capacity.</p>
               </div>
 
               <div className="sm:col-span-2">
@@ -484,45 +469,6 @@ export default function SheltersPage() {
                 {isAuthority && (
                   <div className="pt-3 border-t border-slate-700/60 space-y-2">
                     <div className="flex gap-2">
-                      <select
-                        value={shelter.status}
-                        onChange={(e) =>
-                          handleQuickUpdate(shelter.id, {
-                            status: e.target.value as ShelterStatus,
-                          })
-                        }
-                        className="flex-1 px-2 py-1.5 bg-slate-900/80 border border-slate-700 rounded-lg text-xs text-slate-200"
-                        aria-label="Update status"
-                      >
-                        {SHELTER_STATUSES.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        min={0}
-                        max={shelter.capacity}
-                        defaultValue={shelter.currentOccupancy}
-                        key={`${shelter.id}-${shelter.currentOccupancy}`}
-                        onBlur={(e) => {
-                          const value = Number(e.target.value);
-                          if (
-                            !Number.isNaN(value) &&
-                            value !== shelter.currentOccupancy &&
-                            value >= 0 &&
-                            value <= shelter.capacity
-                          ) {
-                            handleQuickUpdate(shelter.id, { currentOccupancy: value });
-                          }
-                        }}
-                        className="w-20 px-2 py-1.5 bg-slate-900/80 border border-slate-700 rounded-lg text-xs text-slate-200"
-                        aria-label="Update occupancy"
-                        title="Edit occupancy and click away to save"
-                      />
-                    </div>
-                    <div className="flex gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -534,6 +480,7 @@ export default function SheltersPage() {
                       <Button
                         variant="danger"
                         size="sm"
+                        aria-label={`Delete ${shelter.name}`}
                         onClick={() => handleDelete(shelter.id)}
                       >
                         <Trash2 size={13} />

@@ -17,8 +17,9 @@ export const errorHandler = (
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction,
 ): void => {
-  const statusCode = err.statusCode ?? 500;
-  const message = err.message || 'Internal Server Error';
+  const conflict = err.name === 'VersionError' || (err as any).code === 11000;
+  const statusCode = conflict ? 409 : err.statusCode ?? 500;
+  const message = conflict ? 'This record changed or already exists. Refresh and try again.' : err.message || 'Internal Server Error';
 
   console.error(`[${req.method}] ${req.path} → ${statusCode}: ${message}`);
 
