@@ -7,6 +7,7 @@ import { ShieldAlert, Users, Search, UserCheck, UserX, Shield, Filter, RefreshCw
 import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { Button } from '@/components/ui/Button';
 import { User, Role } from '@/types';
 import { getAllUsers, updateUserRole, toggleUserStatus, getAdminOverview } from '@/lib/admin';
@@ -17,6 +18,7 @@ export default function AdminPage() {
 
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -44,8 +46,9 @@ export default function AdminPage() {
         search: searchQuery || undefined,
       });
       setUsers(data.users || []);
+      setLoadError('');
     } catch (err) {
-      console.error('Failed to load users', err);
+      setLoadError('Unable to load this page. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -56,7 +59,7 @@ export default function AdminPage() {
       const data = await getAdminOverview();
       setSystemStats(data.systemStats);
     } catch (err) {
-      console.error('Failed to load system overview', err);
+      setLoadError('Unable to load system overview. Refresh to retry.');
     }
   }, []);
 
@@ -77,7 +80,7 @@ export default function AdminPage() {
       await fetchUsers();
       await fetchOverview();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to update role');
+      setLoadError(err.response?.data?.message || 'Failed to update role');
     } finally {
       setActionLoading(null);
     }
@@ -92,7 +95,7 @@ export default function AdminPage() {
       await fetchUsers();
       await fetchOverview();
     } catch (err: any) {
-      alert(err.response?.data?.message || `Failed to ${action} user`);
+      setLoadError(err.response?.data?.message || `Failed to ${action} user`);
     } finally {
       setActionLoading(null);
     }
@@ -108,6 +111,7 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
+      {loadError && <ErrorNotice message={loadError} onRetry={() => void fetchUsers()} />}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -159,14 +163,14 @@ export default function AdminPage() {
             <input
               type="text"
               placeholder="Search user by name or email…"
-              value={searchQuery}
+              aria-label="Search users" value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700 text-sm text-white pl-9 pr-3 py-1.5 rounded-lg focus:outline-none focus:border-orange-500"
             />
           </div>
 
           <select
-            value={roleFilter}
+            aria-label="Filter users by role" value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
             className="bg-slate-800 text-slate-200 text-sm rounded-lg px-3 py-1.5 border border-slate-700 focus:outline-none focus:border-orange-500"
           >
@@ -178,7 +182,7 @@ export default function AdminPage() {
           </select>
 
           <select
-            value={statusFilter}
+            aria-label="Filter users by account status" value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-slate-800 text-slate-200 text-sm rounded-lg px-3 py-1.5 border border-slate-700 focus:outline-none focus:border-orange-500"
           >
@@ -197,7 +201,7 @@ export default function AdminPage() {
       <Card className="bg-slate-900 border-slate-800 overflow-hidden">
         {loading ? (
           <div className="py-20 text-center text-slate-400">Loading system accounts…</div>
-        ) : users.length === 0 ? (
+        ) : loadError && users.length === 0 ? null : users.length === 0 ? (
           <div className="py-16 text-center text-slate-400">No accounts match the specified criteria.</div>
         ) : (
           <div className="overflow-x-auto">
@@ -230,7 +234,7 @@ export default function AdminPage() {
                           </Badge>
                         ) : (
                           <select
-                            value={u.role}
+                            aria-label={`Role for ${u.name}`} value={u.role}
                             disabled={actionLoading === u.id}
                             onChange={(e) => handleRoleChange(u.id, e.target.value as Role)}
                             className="bg-slate-800 text-xs font-semibold text-orange-400 border border-slate-700 rounded px-2 py-1 focus:outline-none focus:border-orange-500"

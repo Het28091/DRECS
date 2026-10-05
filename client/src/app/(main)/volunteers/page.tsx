@@ -100,7 +100,7 @@ export default function VolunteersPage() {
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <div className="relative flex-1 min-w-60"><Search size={16} className="absolute left-3 top-3 text-slate-500" /><input aria-label="Search responders" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, email, or incident" className="w-full pl-10 pr-3 py-2.5 rounded-lg border border-slate-700 bg-slate-900 text-sm" /></div>
         <select aria-label="Filter responders by task status" value={taskFilter} onChange={e => setTaskFilter(e.target.value)} className="px-3 py-2.5 rounded-lg border border-slate-700 bg-slate-900 text-sm"><option value="">All task statuses</option><option value="ASSIGNED">Awaiting acceptance</option><option value="ACCEPTED">Accepted</option><option value="IN_PROGRESS">In progress</option></select>
-        <Link href="/volunteer-requests"><Button variant="outline">Review help offers</Button></Link>
+        <Link href="/volunteer-requests" className="rounded-lg border border-slate-600 px-3 py-2 text-sm hover:bg-slate-800">Review help offers</Link>
       </div>
       {!isLoading && volunteers.length > 0 && !visible.length && <Card>No responders match your search.</Card>}
       {error && (

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { BarChart3, Activity, PieChart as PieIcon, ShieldAlert, Home, Package, Users, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/Card';
+import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { Button } from '@/components/ui/Button';
 import { getOverviewStats, getIncidentTrends, getVolunteerActivity, getResourceUtilization } from '@/lib/analytics';
 import { OverviewAnalytics } from '@/types';
@@ -52,6 +53,7 @@ export default function AnalyticsPage() {
   } | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (isAuthLoading) return;
@@ -71,11 +73,12 @@ export default function AnalyticsPage() {
       ]);
 
       setOverview(ovData.overview);
+      setLoadError('');
       setIncidentTrends(trData);
       setVolunteerActivity(volData);
       setResourceUtilization(resData);
     } catch (err) {
-      console.error('Failed to load analytics data', err);
+      setLoadError('Unable to load this page. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -99,6 +102,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
+      {loadError && <ErrorNotice message={loadError} onRetry={() => void loadData()} />}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -107,11 +111,11 @@ export default function AnalyticsPage() {
             System Analytics & Insights
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Real-time metric aggregated telemetry across disaster response operations.
+            Approved incident statistics, shelter occupancy, and response activity.
           </p>
         </div>
 
-        <Button variant="ghost" onClick={() => loadData()} className="text-slate-400 hover:text-white border border-slate-800">
+        <Button variant="ghost" loading={loading} onClick={() => loadData()} className="text-slate-400 hover:text-white border border-slate-800">
           <RefreshCw size={14} className="mr-2" /> Refresh Telemetry
         </Button>
       </div>

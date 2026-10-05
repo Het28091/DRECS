@@ -61,11 +61,9 @@ function IncidentCard({ incident, isAuthority }: { incident: Incident; isAuthori
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Link href={`/incidents/${incident.id}`}>
-            <Button variant="outline" size="sm">
+          <Link href={`/incidents/${incident.id}`} className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm text-white hover:bg-slate-800">
               View Details
-            </Button>
-          </Link>
+            </Link>
         </div>
       </div>
     </Card>
@@ -117,6 +115,7 @@ export default function IncidentsPage() {
         );
         setAuthorityIncidents([]);
       }
+      setError(null);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
       setError(
@@ -152,7 +151,7 @@ export default function IncidentsPage() {
 
   if (error) {
     return (
-      <Card className="border-red-800/60 text-red-400 text-sm">{error}</Card>
+      <Card role="alert" className="border-red-800/60 text-red-400 text-sm">{error}<Button className="ml-3" onClick={() => void load()}>Retry</Button></Card>
     );
   }
 
@@ -173,12 +172,10 @@ export default function IncidentsPage() {
           </div>
         </div>
         {!isAuthority && (
-          <Link href="/incidents/report">
-            <Button variant="primary" size="md">
+          <Link href="/incidents/report" className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm text-white hover:bg-slate-800">
               <PlusCircle size={16} />
               Report Incident
-            </Button>
-          </Link>
+            </Link>
         )}
       </div>
 
@@ -192,10 +189,9 @@ export default function IncidentsPage() {
             <option value="">All reviews</option><option value="PENDING">Awaiting approval</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option>
           </select>}
           <select
-            value={statusFilter}
+            aria-label="Filter incidents by status" value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className={selectClass}
-            aria-label="Filter by status"
           >
             <option value="">All statuses</option>
             {INCIDENT_STATUSES.map((s) => (
@@ -206,10 +202,9 @@ export default function IncidentsPage() {
           </select>
 
           <select
-            value={categoryFilter}
+            aria-label="Filter incidents by category" value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             className={selectClass}
-            aria-label="Filter by category"
           >
             <option value="">All categories</option>
             {INCIDENT_CATEGORIES.map((c) => (
@@ -220,10 +215,9 @@ export default function IncidentsPage() {
           </select>
 
           <select
-            value={severityFilter}
+            aria-label="Filter incidents by severity" value={severityFilter}
             onChange={(e) => setSeverityFilter(e.target.value)}
             className={selectClass}
-            aria-label="Filter by severity"
           >
             <option value="">All severities</option>
             {INCIDENT_SEVERITIES.map((s) => (

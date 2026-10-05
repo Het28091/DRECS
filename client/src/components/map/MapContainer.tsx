@@ -109,16 +109,16 @@ export function MapContainer({
 
       marker.bindPopup(`
         <div style="min-width:180px">
-          <p style="font-weight:600;color:#0f172a;font-size:14px;margin:0 0 6px">${escapeHtml(incident.title)}</p>
-          <dl style="font-size:12px;color:#475569;margin:0 0 8px">
+          <p style="font-weight:600;color:#f8fafc;font-size:14px;margin:0 0 6px">${escapeHtml(incident.title)}</p>
+          <dl style="font-size:12px;color:#cbd5e1;margin:0 0 8px">
             <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:2px">
-              <dt>Category</dt><dd style="font-weight:500;color:#1e293b;margin:0">${escapeHtml(incident.category)}</dd>
+              <dt>Category</dt><dd style="font-weight:500;color:#e2e8f0;margin:0">${escapeHtml(incident.category)}</dd>
             </div>
             <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:2px">
-              <dt>Severity</dt><dd style="font-weight:500;color:#1e293b;margin:0">${escapeHtml(incident.severity)}</dd>
+              <dt>Severity</dt><dd style="font-weight:500;color:#e2e8f0;margin:0">${escapeHtml(incident.severity)}</dd>
             </div>
             <div style="display:flex;justify-content:space-between;gap:12px">
-              <dt>Status</dt><dd style="font-weight:500;color:#1e293b;margin:0">${escapeHtml(incident.status.replace(/_/g, ' '))}</dd>
+              <dt>Status</dt><dd style="font-weight:500;color:#e2e8f0;margin:0">${escapeHtml(incident.status.replace(/_/g, ' '))}</dd>
             </div>
           </dl>
           <a href="/incidents/${incident.id}" style="font-size:12px;font-weight:500;color:#ea580c;text-decoration:underline">View details →</a>
@@ -138,16 +138,16 @@ export function MapContainer({
 
       marker.bindPopup(`
         <div style="min-width:180px">
-          <p style="font-weight:600;color:#0f172a;font-size:14px;margin:0 0 6px">${escapeHtml(shelter.name)}</p>
-          <dl style="font-size:12px;color:#475569;margin:0">
+          <p style="font-weight:600;color:#f8fafc;font-size:14px;margin:0 0 6px">${escapeHtml(shelter.name)}</p>
+          <dl style="font-size:12px;color:#cbd5e1;margin:0">
             <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:2px">
-              <dt>Capacity</dt><dd style="font-weight:500;color:#1e293b;margin:0">${shelter.capacity}</dd>
+              <dt>Capacity</dt><dd style="font-weight:500;color:#e2e8f0;margin:0">${shelter.capacity}</dd>
             </div>
             <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:2px">
-              <dt>Occupancy</dt><dd style="font-weight:500;color:#1e293b;margin:0">${shelter.currentOccupancy}</dd>
+              <dt>Occupancy</dt><dd style="font-weight:500;color:#e2e8f0;margin:0">${shelter.currentOccupancy}</dd>
             </div>
             <div style="display:flex;justify-content:space-between;gap:12px">
-              <dt>Status</dt><dd style="font-weight:500;color:#1e293b;margin:0">${escapeHtml(shelter.status)}</dd>
+              <dt>Status</dt><dd style="font-weight:500;color:#e2e8f0;margin:0">${escapeHtml(shelter.status)}</dd>
             </div>
           </dl>
         </div>
@@ -157,11 +157,14 @@ export function MapContainer({
     });
   }, [incidents, shelters]);
 
-  // Fit bounds when data or fitToken changes
+  const lastFitToken = useRef<number | null>(null);
+  // Refresh markers without interrupting a user who is exploring the map.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
+    if (lastFitToken.current === fitToken) return;
+    lastFitToken.current = fitToken;
     const points = [
       ...incidents.map((i) => i.location),
       ...shelters.map((s) => s.location),

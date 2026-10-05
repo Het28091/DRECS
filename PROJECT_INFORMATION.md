@@ -2,6 +2,8 @@
 
 Last updated: 5 October 2026. This document distinguishes implemented behaviour from proposed extensions. See [README](README.md) for environment setup and migration notes.
 
+See [UI Review](UI_REVIEW.md) for the screen-by-screen review scope, fixed interaction issues, browser verification and remaining release checks. Password visibility toggles do not change validation rules. Responsive navigation and resource dialogs support keyboard use; failed loads now expose retry controls.
+
 ## Architecture and access
 
 DRECS uses Next.js 14/React/TypeScript for the client, Express/TypeScript for the API, MongoDB/Mongoose for persistence, Leaflet for maps, Recharts for charts, and Socket.IO for updates. Browser requests carry a JWT; the API checks the current user and role. Authority/admin users review reports, manage shelters/resources, and assign responders. Citizens/volunteers report incidents and offer help.

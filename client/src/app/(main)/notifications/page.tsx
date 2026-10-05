@@ -1,11 +1,12 @@
 'use client';
 import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Bell, CheckCheck, AlertTriangle, Handshake, ClipboardList, Home, Package, Shield, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/Card';
+import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Notification } from '@/types';
@@ -17,15 +18,19 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const pending = useRef(false);
+  const [marking, setMarking] = useState(false);
 
   const fetchNotifications = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const data = await getMyNotifications();
       setNotifications(data.notifications || []);
+      setLoadError('');
       setUnreadCount(data.unreadCount || 0);
     } catch (err) {
-      console.error('Failed to load notifications', err);
+      setLoadError('Unable to load this page. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -50,26 +55,29 @@ export default function NotificationsPage() {
   }, [fetchNotifications]);
 
   const handleMarkAsRead = async (id: string, isAlreadyRead: boolean) => {
-    if (isAlreadyRead) return;
+    if (isAlreadyRead || pending.current) return;
+    pending.current = true; setMarking(true);
     try {
       await markNotificationAsRead(id);
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
       );
-      setUnreadCount((c) => Math.max(0, c - 1));
+      await fetchNotifications(true);
     } catch (err) {
-      console.error('Failed to mark notification as read', err);
-    }
+      setLoadError('Unable to mark notification as read. Please retry.');
+    } finally { pending.current = false; setMarking(false); }
   };
 
   const handleMarkAllRead = async () => {
+    if (pending.current) return;
+    pending.current = true; setMarking(true);
     try {
       await markAllNotificationsAsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
     } catch (err) {
-      console.error('Failed to mark all as read', err);
-    }
+      setLoadError('Unable to mark notifications as read. Please retry.');
+    } finally { pending.current = false; setMarking(false); }
   };
 
   const getNotificationIcon = (type: string) => {
@@ -91,6 +99,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
+      {loadError && <ErrorNotice message={loadError} onRetry={() => void fetchNotifications()} />}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -114,7 +123,7 @@ export default function NotificationsPage() {
 
         {unreadCount > 0 && (
           <Button
-            onClick={handleMarkAllRead}
+            disabled={marking} onClick={handleMarkAllRead}
             variant="ghost"
             className="flex items-center gap-2 text-slate-300 hover:text-white border border-slate-800 hover:bg-slate-800 text-xs"
           >
@@ -126,7 +135,7 @@ export default function NotificationsPage() {
       {/* Notifications list */}
       {loading ? (
         <div className="py-20 text-center text-slate-400">Loading notifications…</div>
-      ) : notifications.length === 0 ? (
+      ) : loadError && notifications.length === 0 ? null : notifications.length === 0 ? (
         <Card className="text-center py-16 text-slate-400 bg-slate-900/50">
           <Bell className="mx-auto text-slate-600 mb-3" size={36} />
           <p className="text-sm font-medium">You have no notifications yet.</p>
@@ -145,8 +154,8 @@ export default function NotificationsPage() {
             return (
               <Card
                 key={n.id}
-                onClick={() => handleMarkAsRead(n.id, n.isRead)}
-                className={`p-4 transition-all duration-150 flex items-start justify-between gap-4 cursor-pointer ${
+
+                className={`p-4 transition-all duration-150 flex items-start justify-between gap-4 ${
                   !n.isRead
                     ? 'bg-slate-900 border-orange-500/40 shadow-lg shadow-orange-500/5'
                     : 'bg-slate-900/60 border-slate-800/80 opacity-85 hover:opacity-100'
@@ -170,16 +179,19 @@ export default function NotificationsPage() {
                   </div>
                 </div>
 
+                <div className="flex flex-col gap-2 shrink-0">
+                {!n.isRead && <Button variant="outline" disabled={marking} onClick={() => void handleMarkAsRead(n.id, n.isRead)}>Mark read</Button>}
                 {n.link && (
                   <Link
-                    href={n.link}
-                    onClick={(e) => e.stopPropagation()}
+                    href={n.link.startsWith('/') && !n.link.startsWith('//') ? n.link : '/notifications'}
+                    onClick={() => void handleMarkAsRead(n.id, n.isRead)}
                     className="p-2 text-slate-400 hover:text-orange-400 bg-slate-800 hover:bg-slate-700/80 rounded-lg border border-slate-700 shrink-0 transition-colors"
-                    title="View related record"
+                    aria-label="View related record" title="View related record"
                   >
                     <ExternalLink size={16} />
                   </Link>
                 )}
+                </div>
               </Card>
             );
           })}

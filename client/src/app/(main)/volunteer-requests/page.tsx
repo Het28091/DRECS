@@ -86,6 +86,7 @@ export default function VolunteerRequestsPage() {
         statusFilter as VolunteerRequestStatus | undefined,
       );
       setRequests(data);
+      setError(null);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
       setError(
@@ -153,10 +154,9 @@ export default function VolunteerRequestsPage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <select
-            value={statusFilter}
+            aria-label="Filter requests by status" value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className={selectClass}
-            aria-label="Filter by status"
           >
             <option value="">All statuses</option>
             <option value="PENDING">Pending</option>

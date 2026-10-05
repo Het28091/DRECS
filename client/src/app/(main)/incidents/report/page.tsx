@@ -197,16 +197,16 @@ export default function ReportIncidentPage() {
               </span>
             </div>
             <input
-              id="title"
+              id="title" aria-invalid={!!fieldErrors.title?.length} aria-describedby={fieldErrors.title?.length ? "title-error" : undefined}
               type="text"
               required
               maxLength={120}
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => { setTitle(e.target.value); setFieldErrors(previous => { const { title: _title, ...rest } = previous; return rest; }); }}
               placeholder="Brief summary of emergency (e.g. Flash Flood near MG Road)"
               className={inputClass}
             />
-            {fieldErrors.title && <p className="text-xs text-red-400 mt-1">{fieldErrors.title[0]}</p>}
+            {fieldErrors.title && <p id="title-error" role="alert" className="text-xs text-red-400 mt-1">{fieldErrors.title[0]}</p>}
           </div>
 
           <div>
@@ -219,16 +219,16 @@ export default function ReportIncidentPage() {
               </span>
             </div>
             <textarea
-              id="description"
+              id="description" aria-invalid={!!fieldErrors.description?.length} aria-describedby={fieldErrors.description?.length ? "description-error" : undefined}
               required
               rows={4}
               maxLength={2000}
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => { setDescription(e.target.value); setFieldErrors(previous => { const { description: _description, ...rest } = previous; return rest; }); }}
               placeholder="Describe the emergency situation, immediate hazards, trapped individuals, or medical urgency in detail…"
               className={`${inputClass} resize-y min-h-[100px]`}
             />
-            {fieldErrors.description && <p className="text-xs text-red-400 mt-1">{fieldErrors.description[0]}</p>}
+            {fieldErrors.description && <p id="description-error" role="alert" className="text-xs text-red-400 mt-1">{fieldErrors.description[0]}</p>}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

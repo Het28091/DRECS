@@ -4,8 +4,10 @@ import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 import { useState, useEffect, useCallback } from 'react';
 import { Package, Plus, Filter, AlertTriangle, CheckCircle2, ShieldAlert, Wrench, Send, RefreshCw, Trash2, Edit } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { Modal } from '@/components/ui/Modal';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { Button } from '@/components/ui/Button';
 import { Resource } from '@/types';
 import { getAllResources, createResource, updateResource, deleteResource, allocateResource, releaseResource } from '@/lib/resources';
@@ -19,6 +21,7 @@ export default function ResourcesPage() {
   const [resources, setResources] = useState<Resource[]>([]);
   const [incidents, setIncidents] = useState<{ id: string; title: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
 
@@ -52,6 +55,7 @@ export default function ResourcesPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [actionError, setActionError] = useState('');
 
   const fetchResources = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -61,12 +65,13 @@ export default function ResourcesPage() {
         status: selectedStatus || undefined,
       });
       setResources(data.resources || []);
+      setLoadError('');
       if (isAuthorityOrAdmin) {
         const data = await getAllIncidents();
         setIncidents(data.incidents.filter(i => i.approvalStatus === 'APPROVED' && ['UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS'].includes(i.status)).map(i => ({ id: i.id, title: i.title })));
       }
     } catch (err) {
-      console.error('Failed to fetch resources', err);
+      setLoadError('Unable to load this page. Check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -81,6 +86,7 @@ export default function ResourcesPage() {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     setSubmitting(true);
     setErrorMsg('');
     try {
@@ -145,23 +151,27 @@ export default function ResourcesPage() {
   };
 
   const handleRelease = async (resourceId: string, incidentId: string) => {
+    if (submitting) return;
+    setActionError('');
     if (!confirm('Are you sure you want to release this resource allocation?')) return;
     try {
+      setSubmitting(true);
       await releaseResource(resourceId, { incidentId });
       await fetchResources();
     } catch (err) {
-      console.error('Failed to release allocation', err);
-    }
+      setActionError('Unable to release this allocation. Please retry.');
+    } finally { setSubmitting(false); }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this resource?')) return;
     try {
+      setSubmitting(true);
       await deleteResource(id);
       await fetchResources();
     } catch (err) {
-      console.error('Failed to delete resource', err);
-    }
+      setActionError('Unable to delete this resource. Please retry.');
+    } finally { setSubmitting(false); }
   };
 
   const getStatusBadge = (status: string) => {
@@ -181,6 +191,8 @@ export default function ResourcesPage() {
 
   return (
     <div className="space-y-6">
+      {loadError && <ErrorNotice message={loadError} onRetry={() => void fetchResources()} />}
+      {actionError && <ErrorNotice message={actionError} />}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -194,7 +206,7 @@ export default function ResourcesPage() {
         </div>
 
         {isAuthorityOrAdmin && (
-          <Button onClick={() => setShowCreateModal(true)} className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600">
+          <Button onClick={() => { setErrorMsg(''); setShowCreateModal(true); }} className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600">
             <Plus size={16} /> Add Resource
           </Button>
         )}
@@ -208,7 +220,7 @@ export default function ResourcesPage() {
         </div>
 
         <select
-          value={selectedCategory}
+          aria-label="Filter resources by category" value={selectedCategory}
           onChange={(e) => setSelectedCategory(e.target.value)}
           className="bg-slate-800 text-slate-200 text-sm rounded-lg px-3 py-1.5 border border-slate-700 focus:outline-none focus:border-orange-500"
         >
@@ -219,7 +231,7 @@ export default function ResourcesPage() {
         </select>
 
         <select
-          value={selectedStatus}
+          aria-label="Filter resources by status" value={selectedStatus}
           onChange={(e) => setSelectedStatus(e.target.value)}
           className="bg-slate-800 text-slate-200 text-sm rounded-lg px-3 py-1.5 border border-slate-700 focus:outline-none focus:border-orange-500"
         >
@@ -237,7 +249,7 @@ export default function ResourcesPage() {
       {/* Resource Grid */}
       {loading ? (
         <div className="py-20 text-center text-slate-400">Loading resources inventory…</div>
-      ) : resources.length === 0 ? (
+      ) : loadError && resources.length === 0 ? null : resources.length === 0 ? (
         <Card className="text-center py-16 text-slate-400 bg-slate-900/50">
           <Package className="mx-auto text-slate-600 mb-3" size={36} />
           <p className="text-sm font-medium">No resources found matching filters.</p>
@@ -305,7 +317,7 @@ export default function ResourcesPage() {
                           </div>
                           {isAuthorityOrAdmin && (
                             <button
-                              onClick={() => handleRelease(item.id, alloc.incidentId)}
+                              disabled={submitting} onClick={() => handleRelease(item.id, alloc.incidentId)}
                               className="text-slate-400 hover:text-amber-400 text-[10px] underline ml-2"
                               title="Release allocation"
                             >
@@ -323,9 +335,9 @@ export default function ResourcesPage() {
                   <div className="mt-5 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
                     <Button
                       size="sm"
-                      disabled={!isAvailable || item.availableQuantity <= 0}
+                      disabled={submitting || !incidents.length || !isAvailable || item.availableQuantity <= 0} title={!incidents.length ? 'No approved active incidents available' : 'Allocate to an incident'}
                       onClick={() => {
-                        setShowAllocateModal(item);
+                        setErrorMsg(''); setShowAllocateModal(item);
                         setAllocateData({ incidentId: incidents[0]?.id || '', quantity: Math.min(10, item.availableQuantity), notes: '' });
                       }}
                       className="flex-1 bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 border border-orange-500/30 text-xs"
@@ -336,26 +348,26 @@ export default function ResourcesPage() {
                       size="sm"
                       variant="ghost"
                       onClick={() => {
-                        setShowEditModal(item);
+                        setErrorMsg(''); setShowEditModal(item);
                         setEditData({
                           name: item.name,
                           category: item.category,
                           quantity: item.quantity,
                           unit: item.unit,
-                          status: item.status,
+                          status: item.status === 'MAINTENANCE' ? 'MAINTENANCE' : 'AVAILABLE',
                         });
                       }}
                       className="text-slate-400 hover:text-white"
                     >
-                      <Edit size={14} />
+                      <span className="sr-only">Edit {item.name}</span><Edit size={14} />
                     </Button>
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => handleDelete(item.id)}
+                      disabled={submitting} onClick={() => handleDelete(item.id)}
                       className="text-slate-400 hover:text-rose-400"
                     >
-                      <Trash2 size={14} />
+                      <span className="sr-only">Delete {item.name}</span><Trash2 size={14} />
                     </Button>
                   </div>
                 )}
@@ -367,18 +379,14 @@ export default function ResourcesPage() {
 
       {/* Modal: Create Resource */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-md bg-slate-900 border-slate-700 p-6 space-y-4">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Package className="text-orange-500" size={20} /> Add New Emergency Resource
-            </h2>
+        <Modal isOpen={Boolean(showCreateModal)} onClose={() => setShowCreateModal(false)} title="Add emergency resource" busy={submitting}>
 
-            {errorMsg && <p className="text-xs text-rose-400 bg-rose-950/50 p-2 rounded border border-rose-800">{errorMsg}</p>}
+            {errorMsg && <p role="alert" className="text-xs text-rose-400 bg-rose-950/50 p-2 rounded border border-rose-800">{errorMsg}</p>}
 
             <form onSubmit={handleCreateSubmit} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Resource Item Name</label>
-                <input
+                <label htmlFor="resource-field-1" className="block text-xs font-semibold text-slate-300 mb-1">Resource Item Name</label>
+                <input id="resource-field-1"
                   type="text"
                   required
                   minLength={2} maxLength={120}
@@ -391,8 +399,8 @@ export default function ResourcesPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Category</label>
-                  <select
+                  <label htmlFor="resource-field-2" className="block text-xs font-semibold text-slate-300 mb-1">Category</label>
+                  <select id="resource-field-2"
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
@@ -403,8 +411,8 @@ export default function ResourcesPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Unit Type</label>
-                  <input
+                  <label htmlFor="resource-field-3" className="block text-xs font-semibold text-slate-300 mb-1">Unit Type</label>
+                  <input id="resource-field-3"
                     type="text"
                     required
                     maxLength={40}
@@ -417,8 +425,8 @@ export default function ResourcesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Total Quantity</label>
-                <input
+                <label htmlFor="resource-field-4" className="block text-xs font-semibold text-slate-300 mb-1">Total Quantity</label>
+                <input id="resource-field-4"
                   type="number"
                   min="0"
                   required
@@ -429,9 +437,9 @@ export default function ResourcesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Storage location (optional)</label>
+                <label htmlFor="resource-field-5" className="block text-xs font-semibold text-slate-300 mb-1">Storage location (optional)</label>
                 <p className="text-xs text-slate-400 mb-2">Where stock is currently stored. This address does not link inventory to a shelter; incident allocation is a separate action.</p>
-                <input
+                <input id="resource-field-5"
                   type="text"
                   value={formData.locationAddress}
                   onChange={(e) => setFormData({ ...formData, locationAddress: e.target.value })}
@@ -441,23 +449,18 @@ export default function ResourcesPage() {
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3">
-                <Button type="button" variant="ghost" onClick={() => setShowCreateModal(false)}>Cancel</Button>
+                <Button type="button" disabled={submitting} variant="ghost" onClick={() => setShowCreateModal(false)}>Cancel</Button>
                 <Button type="submit" disabled={submitting} className="bg-orange-500 hover:bg-orange-600">
                   {submitting ? 'Creating…' : 'Create Resource'}
                 </Button>
               </div>
             </form>
-          </Card>
-        </div>
+        </Modal>
       )}
 
       {/* Modal: Allocate Resource */}
       {showAllocateModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-md bg-slate-900 border-slate-700 p-6 space-y-4">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Send className="text-orange-500" size={20} /> Allocate "{showAllocateModal.name}"
-            </h2>
+        <Modal isOpen={Boolean(showAllocateModal)} onClose={() => setShowAllocateModal(null)} title="Allocate resource" busy={submitting}>
 
             <p className="text-xs text-slate-400">
               Available Inventory: <strong className="text-emerald-400 font-mono">{showAllocateModal.availableQuantity} {showAllocateModal.unit}</strong>
@@ -467,8 +470,8 @@ export default function ResourcesPage() {
 
             <form onSubmit={handleAllocateSubmit} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Target Active Incident</label>
-                <select
+                <label htmlFor="resource-field-6" className="block text-xs font-semibold text-slate-300 mb-1">Target Active Incident</label>
+                <select id="resource-field-6"
                   required
                   value={allocateData.incidentId}
                   onChange={(e) => setAllocateData({ ...allocateData, incidentId: e.target.value })}
@@ -482,8 +485,8 @@ export default function ResourcesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Allocation Quantity</label>
-                <input
+                <label htmlFor="resource-field-7" className="block text-xs font-semibold text-slate-300 mb-1">Allocation Quantity</label>
+                <input id="resource-field-7"
                   type="number"
                   min="1"
                   max={showAllocateModal.availableQuantity}
@@ -495,8 +498,8 @@ export default function ResourcesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Dispatch Notes</label>
-                <input
+                <label htmlFor="resource-field-8" className="block text-xs font-semibold text-slate-300 mb-1">Dispatch Notes</label>
+                <input id="resource-field-8"
                   type="text"
                   value={allocateData.notes}
                   onChange={(e) => setAllocateData({ ...allocateData, notes: e.target.value })}
@@ -506,30 +509,25 @@ export default function ResourcesPage() {
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3">
-                <Button type="button" variant="ghost" onClick={() => setShowAllocateModal(null)}>Cancel</Button>
+                <Button type="button" disabled={submitting} variant="ghost" onClick={() => setShowAllocateModal(null)}>Cancel</Button>
                 <Button type="submit" disabled={submitting} className="bg-orange-500 hover:bg-orange-600">
                   {submitting ? 'Allocating…' : 'Dispatch Allocation'}
                 </Button>
               </div>
             </form>
-          </Card>
-        </div>
+        </Modal>
       )}
 
       {/* Modal: Edit Resource */}
       {showEditModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-md bg-slate-900 border-slate-700 p-6 space-y-4">
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Edit className="text-orange-500" size={20} /> Edit Resource Details
-            </h2>
+        <Modal isOpen={Boolean(showEditModal)} onClose={() => setShowEditModal(null)} title="Edit resource" busy={submitting}>
 
             {errorMsg && <p className="text-xs text-rose-400 bg-rose-950/50 p-2 rounded border border-rose-800">{errorMsg}</p>}
 
             <form onSubmit={handleEditSubmit} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Name</label>
-                <input
+                <label htmlFor="resource-field-9" className="block text-xs font-semibold text-slate-300 mb-1">Name</label>
+                <input id="resource-field-9"
                   type="text"
                   required
                   minLength={2} maxLength={120}
@@ -541,8 +539,8 @@ export default function ResourcesPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Total Quantity</label>
-                  <input
+                  <label htmlFor="resource-field-10" className="block text-xs font-semibold text-slate-300 mb-1">Total Quantity</label>
+                  <input id="resource-field-10"
                     type="number"
                     min="0"
                     required
@@ -552,28 +550,26 @@ export default function ResourcesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Status Override</label>
-                  <select
+                  <label htmlFor="resource-field-11" className="block text-xs font-semibold text-slate-300 mb-1">Availability mode</label>
+                  <select id="resource-field-11"
                     value={editData.status}
                     onChange={(e) => setEditData({ ...editData, status: e.target.value })}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
                   >
-                    {RESOURCE_STATUSES.map((st) => (
-                      <option key={st} value={st}>{st.replace('_', ' ')}</option>
-                    ))}
+                    <option value="AVAILABLE">Automatic from stock</option>
+                    <option value="MAINTENANCE">Maintenance</option>
                   </select>
                 </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3">
-                <Button type="button" variant="ghost" onClick={() => setShowEditModal(null)}>Cancel</Button>
+                <Button type="button" disabled={submitting} variant="ghost" onClick={() => setShowEditModal(null)}>Cancel</Button>
                 <Button type="submit" disabled={submitting} className="bg-orange-500 hover:bg-orange-600">
                   {submitting ? 'Saving…' : 'Save Changes'}
                 </Button>
               </div>
             </form>
-          </Card>
-        </div>
+        </Modal>
       )}
     </div>
   );

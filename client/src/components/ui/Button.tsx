@@ -31,6 +31,7 @@ const sizes: Record<Size, string> = {
 };
 
 export function Button({
+  type = 'button',
   variant = 'primary',
   size = 'md',
   loading = false,
@@ -40,7 +41,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   return (
-    <button
+    <button type={type} aria-busy={loading || undefined}
       className={cn(
         'inline-flex items-center justify-center rounded-md transition-all',
         'focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-slate-950',

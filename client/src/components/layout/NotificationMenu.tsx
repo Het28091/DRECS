@@ -67,7 +67,7 @@ export function NotificationMenu() {
       <Bell size={18} />
       {unread > 0 && <span className="absolute -top-1 -right-1 min-w-4 px-1 rounded-full bg-orange-600 text-white text-[10px]">{unread > 99 ? '99+' : unread}</span>}
     </button>
-    {open && <section id="notification-menu" aria-label="Recent notifications" className="absolute right-0 mt-3 w-80 max-w-[90vw] rounded-xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden">
+    {open && <section id="notification-menu" aria-label="Recent notifications" className="fixed right-3 top-14 sm:absolute sm:right-0 sm:top-auto mt-3 w-80 max-w-[90vw] rounded-xl border border-slate-700 bg-slate-900 shadow-xl overflow-hidden">
       <div className="p-4 border-b border-slate-800 font-semibold">Notifications <span className="text-slate-400">({unread} unread)</span></div>
       {error && <p role="alert" className="p-4 text-red-300">{error}</p>}
       <div className="max-h-80 overflow-y-auto">

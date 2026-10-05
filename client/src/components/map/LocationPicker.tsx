@@ -29,5 +29,9 @@ export default function LocationPicker({ value, onChange }: {
     else marker.current = L.circleMarker(value, { radius: 10, color: '#fff', fillColor: '#f97316', fillOpacity: 1 }).addTo(map.current);
     if (!map.current.getBounds().contains(value)) map.current.setView(value, 15);
   }, [value?.[0], value?.[1]]);
-  return <div ref={container} className="h-72 rounded-xl relative z-0" aria-label="Select incident location by clicking the map" />;
+  return <div className="space-y-2">
+    <div ref={container} tabIndex={0} className="h-72 rounded-xl relative z-0" aria-label="Select incident location by clicking the map" />
+    <p className="text-xs text-slate-400">Keyboard: focus the map and use arrow keys to pan, then select its center below.</p>
+    <button type="button" className="rounded-lg border border-slate-600 px-3 py-2 text-sm hover:bg-slate-800" onClick={() => { const center = map.current?.getCenter(); if (center) onChange([center.lat, center.wrap().lng]); }}>Use map center</button>
+  </div>;
 }

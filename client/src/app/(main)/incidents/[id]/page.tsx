@@ -539,7 +539,7 @@ export default function IncidentDetailPage() {
                       id="vr-skills" maxLength={810} aria-invalid={!!offerErrors.skills}
                       type="text"
                       value={skills}
-                      onChange={(e) => setSkills(e.target.value)}
+                      onChange={(e) => { setSkills(e.target.value); setOfferErrors(previous => { const { skills: _field, ...rest } = previous; return rest; }); }}
                       placeholder="e.g. First aid, Driving, Rescue"
                       className={inputClass}
                     />
@@ -554,7 +554,7 @@ export default function IncidentDetailPage() {
                     <textarea
                       id="vr-experience" maxLength={2000} aria-invalid={!!offerErrors.experience}
                       value={experience}
-                      onChange={(e) => setExperience(e.target.value)}
+                      onChange={(e) => { setExperience(e.target.value); setOfferErrors(previous => { const { experience: _field, ...rest } = previous; return rest; }); }}
                       placeholder="Describe any relevant experience"
                       rows={2}
                       className={inputClass}
@@ -570,7 +570,7 @@ export default function IncidentDetailPage() {
                     <textarea
                       id="vr-message" maxLength={1000} aria-invalid={!!offerErrors.message}
                       value={message}
-                      onChange={(e) => setMessage(e.target.value)}
+                      onChange={(e) => { setMessage(e.target.value); setOfferErrors(previous => { const { message: _field, ...rest } = previous; return rest; }); }}
                       placeholder="How would you like to help?"
                       rows={2}
                       className={inputClass}
@@ -587,7 +587,7 @@ export default function IncidentDetailPage() {
                       id="vr-phone" maxLength={10} inputMode="numeric" pattern="[0-9]{10}" aria-invalid={!!offerErrors.phoneNumber}
                       type="tel"
                       value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      onChange={(e) => { setPhoneNumber(e.target.value); setOfferErrors(previous => { const { phoneNumber: _field, ...rest } = previous; return rest; }); }}
                       placeholder="10-digit contact number"
                       className={inputClass}
                     />

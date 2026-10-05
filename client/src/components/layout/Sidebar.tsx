@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Modal } from '@/components/ui/Modal';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -76,7 +77,7 @@ const VOLUNTEER_TASK_ITEM: NavItem = {
 
 const CITIZEN_ROLES: Role[] = ['citizen', 'volunteer'];
 
-export function Sidebar() {
+export function Sidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
   const pathname = usePathname();
   const { user, isLoading } = useAuth();
   const { hasVolunteerCapability, isLoading: isCapabilityLoading } =
@@ -95,15 +96,7 @@ export function Sidebar() {
     }
   }
 
-  return (
-    <aside className="w-60 bg-slate-900 border-r border-slate-800 fixed top-14 left-0 bottom-0 flex flex-col z-30 font-sans">
-      <div className="px-3 py-2 border-b border-slate-800 bg-slate-950/60">
-        <p className="text-[10px] uppercase font-mono font-bold text-slate-400 tracking-wider">
-          Operating Console Navigation
-        </p>
-      </div>
-
-      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+  const navigation = (<nav aria-label="Main navigation" className="flex-1 p-2 space-y-1 overflow-y-auto">
         {isLoading || isCapabilityLoading ? (
           <p className="px-3 py-2 text-xs text-slate-500 font-mono">Loading menu…</p>
         ) : (
@@ -122,6 +115,8 @@ export function Sidebar() {
               <Link
                 key={`${href}-${label}`}
                 href={href}
+                onClick={onClose}
+                aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'flex items-center gap-2.5 px-3 py-2 rounded text-xs font-semibold transition-all duration-100',
                   isActive
@@ -135,8 +130,9 @@ export function Sidebar() {
             );
           })
         )}
-      </nav>
-
-    </aside>
-  );
+      </nav>);
+  return <>
+    <aside className="hidden md:flex w-60 bg-slate-900 border-r border-slate-800 fixed top-14 left-0 bottom-0 flex-col z-30">{navigation}</aside>
+    <Modal isOpen={mobileOpen} onClose={onClose} title="Navigation" size="sm">{navigation}</Modal>
+  </>;
 }

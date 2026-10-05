@@ -58,6 +58,7 @@ export default function VolunteerTasksPage() {
     try {
       const data = await fetchMyAssignments();
       setAssignments(data);
+      setError(null);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
       setError(

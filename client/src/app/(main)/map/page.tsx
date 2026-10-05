@@ -54,7 +54,8 @@ export default function MapPage() {
       ]);
       setIncidents(incidentData);
       setShelters(shelterData);
-      setFitToken((t) => t + 1);
+      if (!silent) setFitToken((t) => t + 1);
+      setError(null);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
       setError(
