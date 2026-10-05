@@ -50,13 +50,16 @@ test('calendar limit resets exactly at midnight India time', () => {
 });
 test('incident form validates bounds and does not classify or override severity', () => {
   assert.equal(createIncidentSchema.parse(validReport).severity, 'HIGH');
+  for (const latitude of ['', null, undefined]) {
+    assert.equal(createIncidentSchema.safeParse({ ...validReport, location: { latitude, longitude: 72 } }).success, false);
+  }
   assert.equal(createIncidentSchema.safeParse({ ...validReport, location: { latitude: 91, longitude: 72 } }).success, false);
   assert.equal(createIncidentSchema.safeParse({ ...validReport, title: '   ' }).success, false);
 });
 test('offer help rejects empty fields, invalid phones, excessive skills, and stripped markup', () => {
-  const valid = { skills: ['First aid'], experience: 'Trained in first aid', message: 'I can assist with medical supplies', phoneNumber: '+91 98765 43210' };
+  const valid = { skills: ['First aid'], experience: 'Trained in first aid', message: 'I can assist with medical supplies', phoneNumber: '9876543210' };
   assert.equal(createVolunteerRequestSchema.safeParse(valid).success, true);
-  for (const patch of [{ skills: [] }, { skills: Array(11).fill('Rescue') }, { experience: ' ' }, { message: '<b></b>' }, { phoneNumber: 'abcdefghij' }, { phoneNumber: '0000000000' }]) {
+  for (const patch of [{ skills: [] }, { skills: Array(11).fill('Rescue') }, { experience: ' ' }, { message: '<b></b>' }, { phoneNumber: 'abcdefghij' }, { phoneNumber: '0000000000' }, { phoneNumber: '98765432101' }, { phoneNumber: '+919876543210' }, { phoneNumber: '987654321' }, { phoneNumber: '98765 43210' }]) {
     assert.equal(createVolunteerRequestSchema.safeParse({ ...valid, ...patch }).success, false);
   }
 });
@@ -196,4 +199,65 @@ test('shelter updates reopen space and reject over-capacity occupancy', async ()
   mock.method(Shelter, 'findById', async () => ({ _id: new Types.ObjectId(id), capacity: 10, currentOccupancy: 10, status: 'FULL', save: async () => {} }));
   assert.equal((await run(updateShelter, { body: { currentOccupancy: 9 } })).body.shelter.status, 'ACTIVE');
   assert.equal((await run(updateShelter, { body: { currentOccupancy: 11 } })).status, 400);
+});
+
+
+test('all resource categories offered by the client validate and create successfully', async () => {
+  const { readFileSync } = require('node:fs');
+  const { resolve } = require('node:path');
+  const { Resource, RESOURCE_CATEGORIES } = require('../src/models/Resource');
+  const { createResourceSchema } = require('../src/utils/validators');
+  const { createResource } = require('../src/controllers/resourceController');
+  const constants = readFileSync(resolve(__dirname, '../../client/src/lib/constants.ts'), 'utf8');
+  const block = constants.split('export const RESOURCE_CATEGORIES = [')[1].split('] as const')[0];
+  const clientCategories = [...block.matchAll(/'([^']+)'/g)].map((match: any) => match[1]);
+  assert.deepEqual(clientCategories, RESOURCE_CATEGORIES);
+  mock.method(Resource, 'create', async (data: any) => ({ _id: new Types.ObjectId(id), ...data }));
+  for (const category of clientCategories) {
+    const body = createResourceSchema.parse({ name: 'Emergency supplies', category, quantity: 100, unit: 'boxes', location: { address: 'Shelter XYZ' } });
+    const result = await run(createResource, { user: { id: reporter, role: 'authority' }, body });
+    assert.equal(result.status, 201);
+    assert.equal(result.body.resource.availableQuantity, 100);
+  }
+});
+
+test('resource validation rejects invalid stock and malformed fields before persistence', () => {
+  const { createResourceSchema, updateResourceSchema, allocateResourceSchema } = require('../src/utils/validators');
+  const valid = { name: 'Water bottles', category: 'Water', quantity: 100, unit: 'bottles' };
+  for (const patch of [{ name: ' ' }, { category: 'Food & Water' }, { quantity: -1 }, { quantity: null }, { quantity: 1.5 }, { quantity: Infinity }, { unit: ' ' }, { location: { latitude: 91 } }]) {
+    assert.equal(createResourceSchema.safeParse({ ...valid, ...patch }).success, false);
+  }
+  assert.equal(createResourceSchema.safeParse({ ...valid, quantity: 0 }).success, true);
+  assert.equal(updateResourceSchema.safeParse({}).success, false);
+  assert.deepEqual(updateResourceSchema.parse({ name: 'Fresh water' }), { name: 'Fresh water' });
+  assert.equal(allocateResourceSchema.safeParse({ incidentId: id, quantity: 0.5 }).success, false);
+});
+
+for (const role of ['citizen', 'authority', 'admin']) {
+  test('analytics restricts every incident counter to approved reports for ' + role, async () => {
+    const { Resource } = require('../src/models/Resource');
+    const { getOverviewStats } = require('../src/controllers/analyticsController');
+    const filters: any[] = [];
+    mock.method(Incident, 'countDocuments', async (filter: any) => { filters.push(filter); return 1; });
+    mock.method(Shelter, 'countDocuments', async () => 1);
+    mock.method(Shelter, 'aggregate', async () => [{ totalCapacity: 1123, totalOccupancy: 1122 }]);
+    mock.method(Resource, 'countDocuments', async () => 0);
+    mock.method(Resource, 'aggregate', async () => []);
+    mock.method(User, 'countDocuments', async () => 0);
+    mock.method(Assignment, 'countDocuments', async () => 0);
+    const result = await run(getOverviewStats, { user: { id: reporter, role } });
+    assert.equal(result.status, 200);
+    assert.equal(filters.length, 4);
+    assert.ok(filters.every(filter => filter.approvalStatus === 'APPROVED'));
+    assert.equal(result.body.overview.shelterOccupancyRate, 99);
+  });
+}
+
+test('incident charts filter pending and rejected reports before grouping', async () => {
+  const { getIncidentTrends } = require('../src/controllers/analyticsController');
+  const pipelines: any[] = [];
+  mock.method(Incident, 'aggregate', async (pipeline: any) => { pipelines.push(pipeline); return []; });
+  assert.equal((await run(getIncidentTrends)).status, 200);
+  assert.equal(pipelines.length, 3);
+  for (const pipeline of pipelines) assert.deepEqual(pipeline[0], { $match: { approvalStatus: 'APPROVED' } });
 });

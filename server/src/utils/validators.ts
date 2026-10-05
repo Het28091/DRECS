@@ -1,4 +1,5 @@
 import { z, ZodSchema } from 'zod';
+import { RESOURCE_CATEGORIES, RESOURCE_STATUSES } from '../models/Resource';
 import { Request, Response, NextFunction } from 'express';
 
 /**
@@ -118,11 +119,11 @@ export const createIncidentSchema = z
       errorMap: () => ({ message: 'Invalid severity level' }),
     }),
     location: z.object({
-      latitude: z.coerce
+      latitude: z
         .number({ required_error: 'Latitude is required' })
         .min(-90, 'Latitude must be between -90 and 90')
         .max(90, 'Latitude must be between -90 and 90'),
-      longitude: z.coerce
+      longitude: z
         .number({ required_error: 'Longitude is required' })
         .min(-180, 'Longitude must be between -180 and 180')
         .max(180, 'Longitude must be between -180 and 180'),
@@ -165,10 +166,8 @@ export const createVolunteerRequestSchema = z.object({
   skills: z.array(z.string().trim().transform(sanitizeInputText).pipe(z.string().min(2).max(80))).min(1, 'Enter at least one skill').max(10, 'Enter at most 10 skills'),
   experience: z.string().trim().transform(sanitizeInputText).pipe(z.string().min(10, 'Describe your experience in at least 10 characters').max(2000)),
   message: z.string().trim().transform(sanitizeInputText).pipe(z.string().min(10, 'Describe how you can help in at least 10 characters').max(1000)),
-  phoneNumber: z.string().trim().regex(/^\+?[0-9 ()-]{10,20}$/, 'Enter a valid phone number').refine(value => {
-    const digits = value.replace(/\D/g, '');
-    return digits.length >= 10 && digits.length <= 15 && !/^(.)\1+$/.test(digits);
-  }, 'Enter a valid phone number with 10 to 15 digits'),
+  phoneNumber: z.string().trim().regex(/^\d{10}$/, 'Enter exactly 10 digits without country code or separators')
+    .refine(value => !/^(.)\1+$/.test(value), 'Enter a valid phone number'),
 });
 
 export const reviewVolunteerRequestSchema = z.object({
@@ -246,3 +245,24 @@ export const paginationSchema = z.object({
 export const objectIdSchema = z
   .string()
   .regex(/^[a-f\d]{24}$/i, 'Invalid MongoDB ObjectId');
+
+// Resource quantities use whole units; choose an appropriate unit (bottles, boxes, etc.).
+export const createResourceSchema = z.object({
+  name: z.string().trim().transform(sanitizeInputText).pipe(z.string().min(2, 'Resource name must contain at least 2 characters').max(120)),
+  category: z.enum(RESOURCE_CATEGORIES, { errorMap: () => ({ message: 'Choose a valid resource category' }) }),
+  quantity: z.number().finite().int().min(0),
+  unit: z.string().trim().min(1, 'Unit is required').max(40).default('units'),
+  location: z.object({
+    latitude: z.number().finite().min(-90).max(90).optional(),
+    longitude: z.number().finite().min(-180).max(180).optional(),
+    address: z.string().trim().max(300).optional(),
+  }).optional(),
+  status: z.enum(RESOURCE_STATUSES).default('AVAILABLE'),
+});
+export const updateResourceSchema = createResourceSchema.partial().refine(data => Object.keys(data).length > 0, 'At least one field is required');
+export const allocateResourceSchema = z.object({
+  incidentId: objectIdSchema,
+  quantity: z.number().finite().int().min(1),
+  notes: z.string().trim().max(300).optional(),
+});
+export const releaseResourceSchema = z.object({ incidentId: objectIdSchema });

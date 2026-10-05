@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, AlertTriangle, MapPin, Navigation, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -33,6 +33,22 @@ export default function ReportIncidentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [locSuccessMsg, setLocSuccessMsg] = useState('');
+
+  // Revalidate location after map, GPS, or address edits; retain unrelated errors.
+  useEffect(() => {
+    if (!latitude || !longitude || !Number.isFinite(Number(latitude)) || !Number.isFinite(Number(longitude)) || Math.abs(Number(latitude)) > 90 || Math.abs(Number(longitude)) > 180 || address.trim().length > 300) return;
+    setFieldErrors(previous => {
+      if (!previous.location) return previous;
+      const { location: _location, ...remaining } = previous;
+      return remaining;
+    });
+  }, [latitude, longitude, address]);
+
+  useEffect(() => {
+    if (Object.keys(fieldErrors).length === 0) {
+      setError(previous => previous === 'Please correct the highlighted validation errors.' || previous === 'Validation failed' ? null : previous);
+    }
+  }, [fieldErrors]);
 
   const handleDetectLocation = () => {
     if (typeof window !== 'undefined' && 'geolocation' in navigator) {

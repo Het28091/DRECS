@@ -95,7 +95,7 @@ export default function ResourcesPage() {
       setFormData({ name: '', category: RESOURCE_CATEGORIES[0], quantity: 100, unit: 'units', locationAddress: '' });
       await fetchResources();
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Failed to create resource');
+      setErrorMsg(Object.values(err.response?.data?.errors || {}).flat().join(' ') || err.response?.data?.message || 'Failed to create resource');
     } finally {
       setSubmitting(false);
     }
@@ -116,7 +116,7 @@ export default function ResourcesPage() {
       setAllocateData({ incidentId: '', quantity: 10, notes: '' });
       await fetchResources();
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Failed to allocate resource');
+      setErrorMsg(Object.values(err.response?.data?.errors || {}).flat().join(' ') || err.response?.data?.message || 'Failed to allocate resource');
     } finally {
       setSubmitting(false);
     }
@@ -138,7 +138,7 @@ export default function ResourcesPage() {
       setShowEditModal(null);
       await fetchResources();
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || 'Failed to update resource');
+      setErrorMsg(Object.values(err.response?.data?.errors || {}).flat().join(' ') || err.response?.data?.message || 'Failed to update resource');
     } finally {
       setSubmitting(false);
     }
@@ -277,7 +277,7 @@ export default function ResourcesPage() {
                             : 'bg-rose-500'
                         }`}
                         style={{
-                          width: `${Math.min(100, Math.max(0, (item.availableQuantity / item.quantity) * 100))}%`,
+                          width: `${Math.min(100, Math.max(0, item.quantity > 0 ? (item.availableQuantity / item.quantity) * 100 : 0))}%`,
                         }}
                       />
                     </div>
@@ -381,6 +381,7 @@ export default function ResourcesPage() {
                 <input
                   type="text"
                   required
+                  minLength={2} maxLength={120}
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. High-Capacity Water Pumps"
@@ -406,6 +407,7 @@ export default function ResourcesPage() {
                   <input
                     type="text"
                     required
+                    maxLength={40}
                     value={formData.unit}
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                     placeholder="units, liters, boxes"
@@ -427,12 +429,13 @@ export default function ResourcesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Storage Depot Location</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Storage location (optional)</label>
+                <p className="text-xs text-slate-400 mb-2">Where stock is currently stored. This address does not link inventory to a shelter; incident allocation is a separate action.</p>
                 <input
                   type="text"
                   value={formData.locationAddress}
                   onChange={(e) => setFormData({ ...formData, locationAddress: e.target.value })}
-                  placeholder="e.g. Central Warehouse Depot #3"
+                  placeholder="e.g. Central Warehouse or Shelter XYZ" maxLength={300}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
                 />
               </div>
@@ -529,6 +532,7 @@ export default function ResourcesPage() {
                 <input
                   type="text"
                   required
+                  minLength={2} maxLength={120}
                   value={editData.name}
                   onChange={(e) => setEditData({ ...editData, name: e.target.value })}
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-orange-500"

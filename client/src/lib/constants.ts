@@ -39,12 +39,13 @@ export const ASSIGNMENT_STATUSES = [
 export const SHELTER_STATUSES = ['ACTIVE', 'FULL', 'INACTIVE'] as const;
 
 export const RESOURCE_CATEGORIES = [
+  'Food',
+  'Water',
   'Medical',
-  'Food & Water',
   'Shelter Supplies',
-  'Rescue Gear',
-  'Power & Generators',
-  'Vehicles',
+  'Vehicle/Transport',
+  'Equipment',
+  'Personnel',
   'Other',
 ] as const;
 

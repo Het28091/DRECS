@@ -287,8 +287,7 @@ export default function IncidentDetailPage() {
     if (!parsedSkills.length || parsedSkills.length > 10 || parsedSkills.some(s => s.length < 2 || s.length > 80)) errors.skills = 'Enter 1 to 10 skills, each 2 to 80 characters.';
     if (experience.trim().length < 10 || experience.trim().length > 2000) errors.experience = 'Describe your experience in 10 to 2000 characters.';
     if (message.trim().length < 10 || message.trim().length > 1000) errors.message = 'Describe how you can help in 10 to 1000 characters.';
-    const digits = phoneNumber.replace(/\D/g, '');
-    if (!/^\+?[0-9 ()-]{10,20}$/.test(phoneNumber.trim()) || digits.length < 10 || digits.length > 15 || /^(.)\1+$/.test(digits)) errors.phoneNumber = 'Enter a valid phone number with 10 to 15 digits.';
+    if (!/^\d{10}$/.test(phoneNumber.trim()) || /^(.)\1+$/.test(phoneNumber.trim())) errors.phoneNumber = 'Enter a valid 10-digit phone number without country code or separators.';
     setOfferErrors(errors);
     if (Object.keys(errors).length) return;
     setIsSubmittingRequest(true);
@@ -585,11 +584,11 @@ export default function IncidentDetailPage() {
                       Phone Number
                     </label>
                     <input
-                      id="vr-phone" maxLength={20} aria-invalid={!!offerErrors.phoneNumber}
+                      id="vr-phone" maxLength={10} inputMode="numeric" pattern="[0-9]{10}" aria-invalid={!!offerErrors.phoneNumber}
                       type="tel"
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value)}
-                      placeholder="Contact number for coordination"
+                      placeholder="10-digit contact number"
                       className={inputClass}
                     />
                   </div>

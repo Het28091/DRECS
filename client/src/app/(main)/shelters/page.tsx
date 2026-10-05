@@ -40,7 +40,7 @@ function statusVariant(
 
 function occupancyPercent(shelter: Shelter): number {
   if (shelter.capacity <= 0) return 0;
-  return Math.min(100, Math.round((shelter.currentOccupancy / shelter.capacity) * 100));
+  return Math.min(100, Math.floor((shelter.currentOccupancy / shelter.capacity) * 100));
 }
 
 export default function SheltersPage() {

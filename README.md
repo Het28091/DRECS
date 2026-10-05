@@ -73,3 +73,7 @@ A partial unique index named active_offer_per_incident prevents simultaneous dup
 - Optional UI preview: run node tests/ui-preview.cjs from server with the client on port 3000. This loopback-only fixture API uses in-memory sample data and never connects to MongoDB. Sign in using authority@example.test or citizen@example.test and any nonempty password. Stop it before starting the real API; it uses port 5000.
 
 Controller tests do not replace integration testing against a disposable MongoDB replica set, especially for transactions, unique-index migration, and concurrent quota enforcement. The UI fixture validates screen behavior only, not backend authorization.
+
+## Project reference
+
+See [Project Information](PROJECT_INFORMATION.md) for validation expressions, status effects, resource troubleshooting, and the proposed shelter inventory and AI roadmap.

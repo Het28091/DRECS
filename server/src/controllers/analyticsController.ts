@@ -14,7 +14,7 @@ import { AuthRequest } from '../middleware/authMiddleware';
  * @access  Authenticated
  */
 export const getOverviewStats = asyncHandler(async (_req: AuthRequest, res: Response) => {
-  const visibility = ['authority', 'admin'].includes(_req.user?.role ?? '') ? {} : { approvalStatus: 'APPROVED' };
+  const visibility = { approvalStatus: 'APPROVED' };
   const [
     totalIncidents,
     activeIncidents,
@@ -61,7 +61,7 @@ export const getOverviewStats = asyncHandler(async (_req: AuthRequest, res: Resp
 
   const shelterOccupancyRate =
     shelterStats.totalCapacity > 0
-      ? Math.round((shelterStats.totalOccupancy / shelterStats.totalCapacity) * 100)
+      ? Math.floor((shelterStats.totalOccupancy / shelterStats.totalCapacity) * 100)
       : 0;
 
   res.status(200).json({
@@ -93,13 +93,16 @@ export const getOverviewStats = asyncHandler(async (_req: AuthRequest, res: Resp
 export const getIncidentTrends = asyncHandler(async (_req: AuthRequest, res: Response) => {
   const [byStatus, byCategory, bySeverity] = await Promise.all([
     Incident.aggregate([
+      { $match: { approvalStatus: 'APPROVED' } },
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]),
     Incident.aggregate([
+      { $match: { approvalStatus: 'APPROVED' } },
       { $group: { _id: '$category', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]),
     Incident.aggregate([
+      { $match: { approvalStatus: 'APPROVED' } },
       { $group: { _id: '$severity', count: { $sum: 1 } } },
     ]),
   ]);
