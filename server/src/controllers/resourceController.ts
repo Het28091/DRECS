@@ -10,6 +10,8 @@ import { dispatchNotificationToRoles } from '../socket';
 
 export const formatResource = (resource: IResourceDocument) => ({
   id: resource._id.toString(),
+  storageId: resource.storageId?.toString(),
+  shelterReserved: resource.shelterReserved || 0,
   name: resource.name,
   category: resource.category,
   quantity: resource.quantity,
@@ -137,6 +139,7 @@ export const updateResource = asyncHandler(async (req: AuthRequest, res: Respons
 
   const { name, category, quantity, unit, location, status } = req.body;
 
+  if (resource.logisticsLinked && ((name !== undefined && name !== resource.name) || (category !== undefined && category !== resource.category) || (unit !== undefined && unit !== resource.unit) || location !== undefined)) throw createError('Linked inventory identity and storage cannot be changed; create a separate resource lot', 409);
   if (name !== undefined) resource.name = name;
   if (category !== undefined) {
     if (!RESOURCE_CATEGORIES.includes(category)) {
@@ -150,7 +153,7 @@ export const updateResource = asyncHandler(async (req: AuthRequest, res: Respons
       throw createError('Quantity must be a non-negative number', 400);
     }
     // Calculate total currently allocated
-    const currentlyAllocated = resource.allocations.reduce((sum, a) => sum + a.quantity, 0);
+    const currentlyAllocated = resource.allocations.reduce((sum, a) => sum + a.quantity, resource.shelterReserved || 0);
     if (newQuantity < currentlyAllocated) {
       throw createError(
         `Total quantity cannot be less than currently allocated quantity (${currentlyAllocated})`,
@@ -189,7 +192,8 @@ export const deleteResource = asyncHandler(async (req: AuthRequest, res: Respons
     throw createError('Invalid resource ID', 400);
   }
 
-  const resource = await Resource.findByIdAndDelete(req.params.id);
+  const resource = await Resource.findOneAndDelete({ _id: req.params.id, logisticsLinked: { $ne: true }, 'allocations.0': { $exists: false } });
+  if (!resource && await Resource.exists({ _id: req.params.id })) throw createError('Release allocations before deleting. Linked logistics inventory must be retained for audit history.', 409);
   if (!resource) {
     throw createError('Resource not found', 404);
   }

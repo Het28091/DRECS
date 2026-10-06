@@ -1,4 +1,5 @@
 'use client';
+import { isValidMobile } from '@/lib/phone';
 import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -287,7 +288,7 @@ export default function IncidentDetailPage() {
     if (!parsedSkills.length || parsedSkills.length > 10 || parsedSkills.some(s => s.length < 2 || s.length > 80)) errors.skills = 'Enter 1 to 10 skills, each 2 to 80 characters.';
     if (experience.trim().length < 10 || experience.trim().length > 2000) errors.experience = 'Describe your experience in 10 to 2000 characters.';
     if (message.trim().length < 10 || message.trim().length > 1000) errors.message = 'Describe how you can help in 10 to 1000 characters.';
-    if (!/^\d{10}$/.test(phoneNumber.trim()) || /^(.)\1+$/.test(phoneNumber.trim())) errors.phoneNumber = 'Enter a valid 10-digit phone number without country code or separators.';
+    if (!isValidMobile(phoneNumber.trim())) errors.phoneNumber = 'Enter a plausible 10-digit Indian mobile number starting with 6–9. Repeated/sequential placeholders are not accepted.';
     setOfferErrors(errors);
     if (Object.keys(errors).length) return;
     setIsSubmittingRequest(true);
@@ -584,11 +585,11 @@ export default function IncidentDetailPage() {
                       Phone Number
                     </label>
                     <input
-                      id="vr-phone" maxLength={10} inputMode="numeric" pattern="[0-9]{10}" aria-invalid={!!offerErrors.phoneNumber}
+                      id="vr-phone" maxLength={10} inputMode="numeric" pattern="[6-9][0-9]{9}" aria-invalid={!!offerErrors.phoneNumber}
                       type="tel"
                       value={phoneNumber}
                       onChange={(e) => { setPhoneNumber(e.target.value); setOfferErrors(previous => { const { phoneNumber: _field, ...rest } = previous; return rest; }); }}
-                      placeholder="10-digit contact number"
+                      placeholder="Mobile number starting with 6–9"
                       className={inputClass}
                     />
                   </div>

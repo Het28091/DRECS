@@ -57,7 +57,7 @@ test('incident form validates bounds and does not classify or override severity'
   assert.equal(createIncidentSchema.safeParse({ ...validReport, title: '   ' }).success, false);
 });
 test('offer help rejects empty fields, invalid phones, excessive skills, and stripped markup', () => {
-  const valid = { skills: ['First aid'], experience: 'Trained in first aid', message: 'I can assist with medical supplies', phoneNumber: '9876543210' };
+  const valid = { skills: ['First aid'], experience: 'Trained in first aid', message: 'I can assist with medical supplies', phoneNumber: '9815263740' };
   assert.equal(createVolunteerRequestSchema.safeParse(valid).success, true);
   for (const patch of [{ skills: [] }, { skills: Array(11).fill('Rescue') }, { experience: ' ' }, { message: '<b></b>' }, { phoneNumber: 'abcdefghij' }, { phoneNumber: '0000000000' }, { phoneNumber: '98765432101' }, { phoneNumber: '+919876543210' }, { phoneNumber: '987654321' }, { phoneNumber: '98765 43210' }]) {
     assert.equal(createVolunteerRequestSchema.safeParse({ ...valid, ...patch }).success, false);

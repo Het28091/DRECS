@@ -438,7 +438,7 @@ export default function ResourcesPage() {
 
               <div>
                 <label htmlFor="resource-field-5" className="block text-xs font-semibold text-slate-300 mb-1">Storage location (optional)</label>
-                <p className="text-xs text-slate-400 mb-2">Where stock is currently stored. This address does not link inventory to a shelter; incident allocation is a separate action.</p>
+                <p className="text-xs text-slate-400 mb-2">Optional address for this lot. After creating it, open Shelter Supplies → Storage to link a warehouse or shelter and manage deliveries.</p>
                 <input id="resource-field-5"
                   type="text"
                   value={formData.locationAddress}

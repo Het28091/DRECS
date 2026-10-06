@@ -10,6 +10,7 @@ export interface IShelterLocation {
 }
 
 export interface IShelter {
+  logisticsLinked?: boolean;
   name: string;
   location: IShelterLocation;
   capacity: number;
@@ -48,6 +49,7 @@ const shelterLocationSchema = new Schema<IShelterLocation>(
 
 const shelterSchema = new Schema<IShelterDocument>(
   {
+    logisticsLinked: { type: Boolean, default: false },
     name: {
       type: String,
       required: [true, 'Shelter name is required'],

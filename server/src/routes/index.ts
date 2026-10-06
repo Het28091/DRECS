@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import logisticsRoutes from './logisticsRoutes';
 import authRoutes from './authRoutes';
 import incidentRoutes from './incidentRoutes';
 import volunteerRoutes from './volunteerRoutes';
@@ -13,6 +14,7 @@ import adminRoutes from './adminRoutes';
 
 const router = Router();
 
+router.use('/logistics', logisticsRoutes);
 router.use('/auth', authRoutes);
 router.use('/incidents', incidentRoutes);
 router.use('/volunteers', volunteerRoutes);

@@ -32,13 +32,14 @@ Each user can submit **5 incident reports per calendar day**, resetting at **00:
 - **Dashboard** contains incident lists, status/category/severity filters, and authority approval filters. The previous /incidents and /incidents/my list routes redirect here.
 - **Shelters:** Cards are read-only. Click Edit, change the form, then Save Changes or Cancel. ACTIVE/FULL follow occupancy automatically; INACTIVE is preserved. Occupancy cannot exceed capacity.
 - **Resources:** Availability determines AVAILABLE, LOW_STOCK (below 20%), or DEPLETED. MAINTENANCE is retained and blocks allocations. Allocation details are authority-only.
+- **Shelter Supplies:** Authority/admin storage links, explicit demand, distance-sorted stock suggestions, reservation → dispatch → receipt, consumption ledger and optional read-only contextual assistant. See Project Information for accounting rules and limits.
 - **Volunteer Force:** Summary counts, search by responder/email/incident, task status filtering, incident links, status badges, and assignment removal controls.
 - **Notifications:** The navbar bell displays an unread count and recent messages. New notifications appear as dismissible popups. Opening one marks it read; the Notifications page retains history.
 - **Sidebar:** The separate Incidents item and bottom footer text have been removed.
 
 ## Setup
 
-Install dependencies in both directories using npm install. Use Node.js 20+ and a MongoDB replica set or Atlas deployment (transactions are required for volunteer approvals).
+Install dependencies in both directories using npm install. Use Node.js 20.19+ and a MongoDB replica set or Atlas deployment (transactions are required for volunteer approvals and supply movements).
 
 Create server/.env with your own values:
 
@@ -48,6 +49,9 @@ NODE_ENV=development
 MONGODB_URI=mongodb://127.0.0.1:27017/drecs?replicaSet=rs0
 JWT_SECRET=replace-with-a-strong-secret
 CLIENT_URL=http://localhost:3000
+# Optional contextual assistant (server-only; reporting does not use AI):
+OPENAI_API_KEY=
+OPENAI_MODEL=
 ```
 
 Create client/.env.local:
@@ -68,12 +72,15 @@ A partial unique index named active_offer_per_incident prevents simultaneous dup
 ## Verification
 
 - server: npm test runs workflow/controller tests with mocked persistence and a real local Socket.IO authentication test. Both client and server dependencies must be installed for the socket client test.
+- server: npm run test:integration runs transaction, conservation, rollback and concurrency tests against a disposable MongoDB replica set; first run downloads the MongoDB binary.
 - server: npm run build compiles the API.
 - client: npm run build validates types and creates the production build.
 - Optional UI preview: run node tests/ui-preview.cjs from server with the client on port 3000. This loopback-only fixture API uses in-memory sample data and never connects to MongoDB. Sign in using authority@example.test or citizen@example.test and any nonempty password. Stop it before starting the real API; it uses port 5000.
+
+For a real-API UI preview, run node tests/logistics-preview.cjs from server with the production client on port 3000. This starts a disposable MongoDB replica set on a random database port, binds the API to loopback port 5000 and disables external AI calls. Sign in with authority@example.test or citizen@example.test and Preview123!. Type stop to clean up; it also stops after 30 minutes. Never use these fixture credentials in production.
 
 Controller tests do not replace integration testing against a disposable MongoDB replica set, especially for transactions, unique-index migration, and concurrent quota enforcement. The UI fixture validates screen behavior only, not backend authorization.
 
 ## Project reference
 
-See [Project Information](PROJECT_INFORMATION.md) for validation expressions, status effects, resource troubleshooting, and the proposed shelter inventory and AI roadmap.
+See [Project Information](PROJECT_INFORMATION.md) for validation expressions, status effects, resource troubleshooting, and the implemented shelter supply workflow, optional AI configuration, and remaining roadmap.

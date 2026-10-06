@@ -31,6 +31,9 @@ export interface IResourceLocation {
 }
 
 export interface IResource {
+  storageId?: Types.ObjectId;
+  shelterReserved?: number;
+  logisticsLinked?: boolean;
   name: string;
   category: ResourceCategory;
   quantity: number;
@@ -72,6 +75,9 @@ const resourceAllocationSchema = new Schema<IResourceAllocation>(
 
 const resourceSchema = new Schema<IResourceDocument>(
   {
+    storageId: { type: Schema.Types.ObjectId, ref: 'StorageLocation' },
+    shelterReserved: { type: Number, default: 0, min: 0 },
+    logisticsLinked: { type: Boolean, default: false },
     name: {
       type: String,
       required: [true, 'Resource name is required'],

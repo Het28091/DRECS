@@ -50,4 +50,8 @@ Production compilation includes all application pages, TypeScript and Next.js li
 5. **P2 destructive-action consistency.** Existing browser confirmations remain for deletes and sensitive role changes. A future shared confirmation dialog can add affected-record details and consistent language; retaining a confirmation is preferable to removing it for visual polish.
 6. **P3 analytics clarity.** Add explicit chart empty states and accessible data tables. Mixed inventory units should not be presented as a meaningful single supply total; use per-unit breakdowns when extending analytics.
 
-The shelter-demand/stock-transfer design and later AI assistant remain separate product work described in [Project Information](PROJECT_INFORMATION.md). Finish the integration and inventory foundations before adding AI recommendations.
+## Supply workflow follow-up — 6 October 2026
+
+Implemented the Shelter Supplies screen and optional contextual assistant described in [Project Information](PROJECT_INFORMATION.md). A real-API browser walkthrough against a disposable MongoDB replica set verified reservation, dispatch, receipt and consumption (100 initial bottles → 40 at source + 40 at shelter + 20 consumed). Missing AI configuration displays a clear disabled state. Integration tests exercise concurrent reservations, rollback, duplicate actions, conservation and protected history. This adds meaningful database coverage without replacing the remaining full multi-role release walkthrough.
+
+Analytics tooltips now explicitly set light label/item colors against the dark background, including Severity Breakdown and Volunteer Request Distribution. Phone submission checks enforce Indian mobile prefixes and reject obvious placeholders on both client and server; ownership still requires future OTP verification.

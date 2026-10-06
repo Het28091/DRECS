@@ -1,6 +1,6 @@
 # Project Information — DRECS
 
-Last updated: 5 October 2026. This document distinguishes implemented behaviour from proposed extensions. See [README](README.md) for environment setup and migration notes.
+Last updated: 6 October 2026. This document distinguishes implemented behaviour from proposed extensions. See [README](README.md) for environment setup and migration notes.
 
 See [UI Review](UI_REVIEW.md) for the screen-by-screen review scope, fixed interaction issues, browser verification and remaining release checks. Password visibility toggles do not change validation rules. Responsive navigation and resource dialogs support keyboard use; failed loads now expose retry controls.
 
@@ -19,7 +19,7 @@ Validation runs on the server even if browser validation is bypassed. Invalid re
 | Registration name | Trimmed, 2–100 characters; HTML sanitization |
 | Email | Zod email validation, trimmed and lowercased; duplicate accounts rejected |
 | Password | At least 8 characters, uppercase, lowercase, digit, and a supported special character |
-| Offer-help phone | Exactly 10 ASCII digits after trimming; repeated identical digits rejected |
+| Offer-help phone | 10 ASCII digits starting with 6–9; repeated and sequential placeholders rejected |
 | Incident title | 3–120 characters after validation/sanitization |
 | Incident description | 10–2000 characters; must differ from title |
 | Incident category/severity | Enumerated values; severity is supplied by the reporter, not AI |
@@ -33,15 +33,18 @@ Validation runs on the server even if browser validation is bypassed. Invalid re
 | Resource address/dispatch notes | Optional, ≤300 characters |
 | MongoDB identifiers | `/^[a-f\d]{24}$/i` |
 
-Phone format:
+Phone format: `/^[6-9]\d{9}$/`. Client and server additionally use this plausibility policy:
 
 ```js
-const validFormat = /^\d{10}$/.test(phone.trim());
-const repeatedDigits = /^(.)\1+$/.test(phone.trim());
-const validPhone = validFormat && !repeatedDigits;
+const validPhone = /^[6-9]\d{9}$/.test(phone)
+  && !/^(\d)\1{9}$/.test(phone)
+  && !/^(\d{2})\1{4}$/.test(phone)
+  && !/^(\d{5})\1$/.test(phone)
+  && !['01234567890123456789', '98765432109876543210']
+    .some(sequence => sequence.includes(phone));
 ```
 
-Example accepted: `9876543210`. Rejected: `98765432101`, `+919876543210`, `98765 43210`, `0000000000`. The input has `maxLength=10`, numeric keyboard hints, and a matching HTML pattern; the API independently enforces the rule. Country codes are not accepted. This is a ten-digit contact-number policy, not an Indian-mobile-prefix or OTP verification policy. Existing stored phone values are not rewritten.
+Example accepted by the format policy: `9815263740`. Rejected: `1234567890`, `9876543210`, `9999999999`, `9898989898`, `9123491234`, country codes, spaces, letters and numbers longer than 10 digits. The API trims surrounding whitespace. The input has maxLength=10 and HTML pattern `[6-9][0-9]{9}`; submit validation applies all extra checks. These are Indian mobile format/plausibility checks, not proof that a number exists or belongs to the user. A real number can match a blocked placeholder pattern; OTP verification is the appropriate future ownership check and requires a delivery provider, expiry, retry limits and abuse controls. Existing stored values are not rewritten.
 
 Password checks are intentionally separate to provide useful feedback. These are the actual expressions used by registration on both client and server:
 
@@ -81,33 +84,45 @@ Shelter cards are read-only until Edit is clicked. ACTIVE/FULL derive from occup
 
 Resource categories are Food, Water, Medical, Shelter Supplies, Vehicle/Transport, Equipment, Personnel, Other. Client dropdown values now match the API. The former client-only categories (Food & Water, Rescue Gear, Power & Generators, Vehicles) caused `400 Invalid resource category` during creation. Rescue equipment/generators can use Equipment; vehicles use Vehicle/Transport. Invalid names, units, quantities and locations now return field validation messages before persistence.
 
-Available quantity is total minus active allocations. Allocation reserves stock for an approved active incident; release returns that reservation. Status is DEPLETED at zero availability, LOW_STOCK below 20% of total, otherwise AVAILABLE. MAINTENANCE is an explicit override that blocks allocation. Merely selecting a stock status does not change quantities.
+Available quantity is source total minus active incident allocations and shelter reservations. Allocation reserves stock for an approved active incident; release returns that reservation. Status is DEPLETED at zero availability, LOW_STOCK below 20% of total, otherwise AVAILABLE. MAINTENANCE is an explicit override that blocks allocation. Merely selecting a stock status does not change quantities.
 
-The storage address describes where stock currently sits. It is currently free text, not a Shelter reference. Entering “Shelter XYZ” does not create a database link, update shelter supplies, or record a delivery. Allocation is to an incident, not to a shelter. The current module tracks reservations, not consumption or verified deliveries. Do not interpret Release as a physical return of already-consumed water.
+## Shelter supplies — implemented
 
-## Recommended extension: shelter supply management (not implemented)
+Authority/admin users open **Shelter Supplies** in the sidebar. All /api/logistics routes authenticate the current account and reject other roles. Existing free-text resource addresses remain usable for incident allocations, but do not imply a shelter link.
 
-Link the modules with explicit entities instead of inferring relationships from address text:
+1. **Storage:** create a warehouse (map coordinates required) or a shelter storage location. A shelter source copies the shelter address/coordinates at creation. Link an existing resource lot with no active incident allocations to that source. Each lot has one immutable source; create a separate lot for another source. Existing addresses are not automatically migrated.
+2. **Needs:** record a shelter, item, category, unit, requested quantity and urgency. Demand is explicit; 2,000 residents do not automatically mean 2,000 bottles. Item and unit matching ignores case/extra spaces but does not convert bottles to litres.
+3. **Suggestions:** calculate unmet demand as max(0, requested − fulfilled − committed), match available stock, exclude maintenance/inactive/same-shelter sources, and sort by straight-line distance. Suggested quantities together cannot exceed current unmet demand. Reading suggestions reserves nothing.
+4. **Transfers:** review and confirm a quantity, then confirm dispatch when goods leave storage and receipt when physically delivered. Every mutation rechecks server state inside a MongoDB transaction.
+5. **Shelter stock:** received goods become shelter on-hand stock. Record actual consumption with a reason. Consumption does not reopen a fulfilled request; create a new request for additional demand.
 
-1. StorageLocation: warehouse or shelter; optional validated `shelterId`, address, coordinates and responsible authority.
-2. InventoryLot: resource type, unit, storage location, total/available/reserved quantity; optional expiry for consumables.
-3. ShelterNeed: shelter, item/unit, requested quantity, fulfilled quantity, urgency, reporting time and deadline. Occupancy alone cannot establish how much water is needed.
-4. Transfer: source lot, destination shelter/incident, quantity, actor and timestamps, with `REQUESTED → RESERVED → DISPATCHED → RECEIVED`; cancellation/return must follow explicit rules.
-5. An append-only stock ledger records receipts, reservations, dispatch, returns and consumption. Never delete history to adjust a balance.
+| Action | Source stock effect | Demand / destination effect |
+| --- | --- | --- |
+| RESERVED | available decreases; shelterReserved increases; total unchanged | committed increases |
+| CANCELLED (only before dispatch) | available restored; shelterReserved decreases | committed decreases |
+| DISPATCHED | source total and shelterReserved decrease; available unchanged | committed remains; shipment is in transit |
+| RECEIVED | source unchanged | committed decreases, fulfilled and shelter on-hand increase |
+| CONSUMED | source unchanged | on-hand decreases, cumulative consumed increases |
 
-Example: warehouse stock is 100 bottles; Shelter XYZ requests 2000 bottles. Reserve 100, leaving zero available; dispatch and confirm receipt; remaining demand is 1900 bottles. This calculation assumes a recorded request of 2000 bottles, not merely 2000 residents. Consumables and reusable equipment need different return rules.
+Example: start with 100 bottles, reserve/dispatch/receive 60, then consume 20. Source stock is 40, shelter on-hand is 40, consumed is 20: the original 100 bottles are accounted for. A 2,000-bottle request has 1,940 still unmet after receipt. Reserved or dispatched goods count as committed until cancelled or received.
 
-Dependencies: schema/API changes, shelter selector and stock screens, unit consistency, migration of existing free-text locations, role checks, atomic stock updates, idempotent transfer actions, audit history and tests for concurrent allocation/cancellation. Multi-document updates can use [MongoDB transactions](https://www.mongodb.com/docs/manual/core/transactions/) on a replica set or sharded deployment. The existing volunteer-review flow already needs transaction-capable MongoDB.
+Models: StorageLocation, ShelterNeed, SupplyTransfer, ShelterStock, StockMovement, AssistantQuota. Resource stores storageId/shelterReserved/logisticsLinked; Shelter stores logisticsLinked. Resource identity/unit/source and linked history cannot be deleted or relabelled through the API. Storage coordinates are a snapshot; no storage edit/move workflow exists yet. The ledger records transfer/consumption actions with actor, quantity and time; latest 100 are shown. Existing resource quantity adjustments remain the older stock-edit workflow and are not transfer ledger events. Received shelter stock is separate from source lots and cannot yet be retransferred. Returns, shipment loss, expiry/batches, need amendments/cancellation, and ledgered replenishment/corrections are future extensions, not implicit status effects.
 
-## Recommended extension: decision support, then AI (not implemented)
+Reservations/consumption use client-generated UUID request keys retained while a confirmation is retried. Reusing a key with different contents returns 409. Repeated same-status transfer actions do not duplicate stock. Concurrent writes use transactions, optimistic versions and unique indexes. MongoDB must be a replica set or sharded deployment; build the new model indexes through the normal migration process when autoIndex is disabled. No destructive migration or automatic data rewrite is performed.
 
-Start with deterministic features: unmet-demand dashboard, low-stock alerts, expiry alerts, matching supplies to recorded needs, responder availability/skills filters, and a completion checklist. These provide useful behaviour without an AI service.
+Routes under /api/logistics: GET / (overview), POST /storage, POST /storage/link, POST /needs, GET /needs/:id/suggestions, POST /transfers, PATCH /transfers/:id, POST /consume, GET /assistant (configuration), POST /assistant (question). IDs, enum values, coordinates and quantities are validated; supply write quantities are whole numbers 1–1,000,000,000. Consumption requires a 3–500 character reason. Overview lists currently load all records except the latest-100 ledger; paginate before large-scale deployment.
 
-A later read-only assistant could answer “Which shelters need water?”, summarize approved incidents, explain shortages, and propose allocations with record links, quantities and last-updated timestamps. Server functions should retrieve authorized current data and calculate balances; the model explains their results. It should say when demand/location data is missing rather than inventing it. Different roles must see only the records and contact details their normal API permits.
+## Contextual assistant — implemented, optional configuration
 
-Dependencies: reliable shelter demand and stock ledger first; a model provider and server-only credentials; constrained read-only query tools; authorization on every tool call; prompt-injection handling for report text; request limits and cost/latency monitoring; evaluation scenarios for stale, missing and conflicting data. Keep changes as proposals requiring authority confirmation, with a fresh stock check at execution. A vector database is not necessary for initial structured inventory queries; document search can be added later for manuals/SOPs.
+The Assistant tab is authority/admin-only and read-only. Set server-only **OPENAI_API_KEY** and **OPENAI_MODEL** to enable it. No model is assumed and no key belongs in client environment variables. Missing configuration leaves deterministic stock suggestions fully operational and disables the Ask button with an explanation.
 
-Nearby-supply matching needs accurate coordinates and distance queries. [MongoDB geospatial queries](https://www.mongodb.com/docs/manual/geospatial-queries/) support GeoJSON and geospatial indexes; adopting them would require converting/indexing the current coordinate fields. Road travel time or route safety requires an additional routing source and current operational data; straight-line distance does not establish a safe route.
+The server sends the question and a current snapshot to the [OpenAI Responses API](https://developers.openai.com/api/docs/guides/migrate-to-responses), with store=false, a 30-second timeout and at most 1,800 output tokens. The UI discloses this transmission before asking. Context includes the most recently updated 30 approved incidents, 30 shelters, 30 requests, aggregate assignment status counts for approved incidents, and optional selected-request stock suggestions. User/volunteer contact fields are not selected. Free-text questions and record titles/addresses may contain information entered by users; do not include private contact details in them. store=false is not a claim about all provider data retention policies.
+
+Shortages, available quantities and distances come from server calculations. The model has no tools or write access. Its answer is plain text, supplied record links are generated locally, and record text is treated as untrusted input. AI output may still be wrong: review current stock suggestions, choose a quantity, and explicitly confirm the normal reservation dialog. The API rechecks stock/demand at confirmation. No AI response can directly approve an incident, dispatch goods, or alter inventory.
+
+Persistent limits: 20 attempts per user per India calendar day and at least 10 seconds between questions. Provider failures consume an attempt; provider errors return controlled 503 responses. Output is a limited snapshot, not exhaustive knowledge of every record. Provider integration is tested with simulated responses; a paid live-provider call is not part of the repository test suite.
+
+Nearby suggestions currently use Haversine distance with existing latitude/longitude fields. No vector database, routing provider or new MongoDB geospatial index is required. At larger scale, GeoJSON plus a 2dsphere index can reduce candidate scans. Straight-line distance does not establish road travel time or route safety. Future AI improvements depend on trustworthy demand/units, evaluations for stale/missing/conflicting records, cost monitoring, and optional document search for approved SOPs. Returns/loss handling, stock reconciliation and OTP ownership checks should precede autonomous operational actions.
 
 ## Refresh, notifications and spam controls
 
@@ -117,8 +132,8 @@ Each user may submit five incident reports per India calendar day (00:00 Asia/Ko
 
 ## Verification and operational notes
 
-Run `npm test` and `npm run build` in server, and `npm run build` in client. Workflow tests mock database calls and do not modify real data. The socket test uses a loopback listener. A production build does not prove live MongoDB connectivity or real browser geolocation permissions.
+Run `npm test`, `npm run test:integration` and `npm run build` in server, and `npm run build` in client. Integration tests use mongodb-memory-server with an isolated temporary replica set, never MONGODB_URI; the first run downloads an official MongoDB binary. Node.js 20.19+ is required for this development dependency. Workflow tests mock database calls and do not modify real data. The socket test uses a loopback listener. A production build does not prove live MongoDB connectivity or real browser geolocation permissions.
 
 Regression coverage includes authority visibility, status guards, five-report quota, phone length, resource-category parity/creation, invalid resource bodies, approved-only analytics and 99% occupancy. Manually verify map and GPS error clearing, resource creation for each category, and two-account live refresh against a test database before deployment. MongoDB transactions and the active-offer unique index must be available; see README migration notes.
 
-Troubleshooting: 400 means invalid input (read field errors); 401 means sign-in required; 403 means insufficient role; 409 means a conflicting edit/duplicate; 429 means the report quota was reached. A remaining 500 needs the exact response and server log to diagnose; do not assume every resource failure was the category mismatch. Keep credentials and real personal data out of logs and screenshots.
+Troubleshooting: 400 means invalid input (read field errors); 401 means sign-in required; 403 means insufficient role; 409 means a conflicting edit/duplicate; 429 means an incident or assistant quota/interval was reached. A remaining 500 needs the exact response and server log to diagnose; do not assume every resource failure was the category mismatch. Keep credentials and real personal data out of logs and screenshots.

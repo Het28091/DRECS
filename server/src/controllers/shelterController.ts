@@ -166,7 +166,8 @@ export const deleteShelter = asyncHandler(async (req: AuthRequest, res: Response
     throw createError('Invalid shelter ID', 400);
   }
 
-  const shelter = await Shelter.findByIdAndDelete(req.params.id);
+  const shelter = await Shelter.findOneAndDelete({ _id: req.params.id, logisticsLinked: { $ne: true } });
+  if (!shelter && await Shelter.exists({ _id: req.params.id })) throw createError('Shelters with supply records must be retained. Mark the shelter inactive instead.', 409);
   if (!shelter) {
     throw createError('Shelter not found', 404);
   }

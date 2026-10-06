@@ -184,7 +184,7 @@ export default function AnalyticsPage() {
                   <BarChart data={incidentTrends.byCategory}>
                     <XAxis dataKey="category" stroke="#64748b" fontSize={11} />
                     <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
-                    <Tooltip
+                    <Tooltip itemStyle={{ color: '#f8fafc' }} labelStyle={{ color: '#f8fafc' }}
                       contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', color: '#fff' }}
                     />
                     <Bar dataKey="count" fill="#f97316" radius={[4, 4, 0, 0]} />
@@ -216,7 +216,7 @@ export default function AnalyticsPage() {
                         <Cell key={`cell-${idx}`} fill={SEVERITY_COLORS[entry.severity] || COLORS[idx % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip
+                    <Tooltip itemStyle={{ color: '#f8fafc' }} labelStyle={{ color: '#f8fafc' }}
                       contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', color: '#fff' }}
                     />
                     <Legend />
@@ -237,7 +237,7 @@ export default function AnalyticsPage() {
                   <BarChart data={resourceUtilization.byCategory}>
                     <XAxis dataKey="category" stroke="#64748b" fontSize={11} />
                     <YAxis stroke="#64748b" fontSize={11} />
-                    <Tooltip
+                    <Tooltip itemStyle={{ color: '#f8fafc' }} labelStyle={{ color: '#f8fafc' }}
                       contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', color: '#fff' }}
                     />
                     <Bar dataKey="availableQuantity" name="Available Qty" fill="#22c55e" radius={[4, 4, 0, 0]} />
@@ -270,7 +270,7 @@ export default function AnalyticsPage() {
                         <Cell key={`cell-vol-${idx}`} fill={COLORS[idx % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip
+                    <Tooltip itemStyle={{ color: '#f8fafc' }} labelStyle={{ color: '#f8fafc' }}
                       contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', color: '#fff' }}
                     />
                     <Legend />

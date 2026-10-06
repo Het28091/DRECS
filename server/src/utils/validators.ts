@@ -1,4 +1,5 @@
 import { z, ZodSchema } from 'zod';
+import { isValidMobile } from './phone';
 import { RESOURCE_CATEGORIES, RESOURCE_STATUSES } from '../models/Resource';
 import { Request, Response, NextFunction } from 'express';
 
@@ -166,8 +167,7 @@ export const createVolunteerRequestSchema = z.object({
   skills: z.array(z.string().trim().transform(sanitizeInputText).pipe(z.string().min(2).max(80))).min(1, 'Enter at least one skill').max(10, 'Enter at most 10 skills'),
   experience: z.string().trim().transform(sanitizeInputText).pipe(z.string().min(10, 'Describe your experience in at least 10 characters').max(2000)),
   message: z.string().trim().transform(sanitizeInputText).pipe(z.string().min(10, 'Describe how you can help in at least 10 characters').max(1000)),
-  phoneNumber: z.string().trim().regex(/^\d{10}$/, 'Enter exactly 10 digits without country code or separators')
-    .refine(value => !/^(.)\1+$/.test(value), 'Enter a valid phone number'),
+  phoneNumber: z.string().trim().refine(isValidMobile, 'Enter a plausible Indian mobile number: 10 digits starting with 6–9; no repeated or sequential placeholders'),
 });
 
 export const reviewVolunteerRequestSchema = z.object({
