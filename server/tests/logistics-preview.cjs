@@ -8,6 +8,7 @@ const {StorageLocation,ShelterNeed}=require('../src/models/Logistics');
 (async()=>{
  const repl=await MongoMemoryReplSet.create({replSet:{count:1,storageEngine:'wiredTiger'}}); await mongoose.connect(repl.getUri()); await Promise.all(Object.values(mongoose.models).map(m=>m.init()));
  const authority=await User.create({name:'Preview Authority',email:'authority@example.test',password:'Preview123!',role:'authority',isActive:true});
+ await User.create({name:'Preview Admin',email:'admin@example.test',password:'Preview123!',role:'admin',isActive:true});
  const citizen=await User.create({name:'Preview Citizen',email:'citizen@example.test',password:'Preview123!',role:'citizen',isActive:true});
  const shelter=await Shelter.create({name:'Waghodia Relief Shelter',location:{latitude:22.3,longitude:73.24,address:'Waghodia Road, Vadodara 390025'},capacity:2100,currentOccupancy:2000,contactInfo:'Preview coordinator',logisticsLinked:true});
  const storage=await StorageLocation.create({name:'Central Supply Depot',kind:'WAREHOUSE',latitude:22.31,longitude:73.19,address:'Central Depot, Vadodara',createdBy:authority._id});

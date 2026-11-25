@@ -55,3 +55,55 @@ Production compilation includes all application pages, TypeScript and Next.js li
 Implemented the Shelter Supplies screen and optional contextual assistant described in [Project Information](PROJECT_INFORMATION.md). A real-API browser walkthrough against a disposable MongoDB replica set verified reservation, dispatch, receipt and consumption (100 initial bottles → 40 at source + 40 at shelter + 20 consumed). Missing AI configuration displays a clear disabled state. Integration tests exercise concurrent reservations, rollback, duplicate actions, conservation and protected history. This adds meaningful database coverage without replacing the remaining full multi-role release walkthrough.
 
 Analytics tooltips now explicitly set light label/item colors against the dark background, including Severity Breakdown and Volunteer Request Distribution. Phone submission checks enforce Indian mobile prefixes and reject obvious placeholders on both client and server; ownership still requires future OTP verification.
+
+## Source inventory — 8 October 2026
+
+All 45 TSX source files were traversed for controls, forms and dialogs. Counts are static JSX occurrences (a mapped component can render many controls); this inventory is not a claim that every state was exercised in a browser. Shared components and targeted screens were reviewed and verified as described below.
+
+| Source | Controls | Forms | Dialogs |
+| --- | ---: | ---: | ---: |
+| client/src/app/(auth)/layout.tsx | 0 | 0 | 0 |
+| client/src/app/(auth)/login/page.tsx | 3 | 1 | 0 |
+| client/src/app/(auth)/register/layout.tsx | 0 | 0 | 0 |
+| client/src/app/(auth)/register/page.tsx | 4 | 1 | 0 |
+| client/src/app/(main)/admin/page.tsx | 6 | 0 | 0 |
+| client/src/app/(main)/analytics/page.tsx | 1 | 0 | 0 |
+| client/src/app/(main)/dashboard/page.tsx | 0 | 0 | 0 |
+| client/src/app/(main)/incidents/my/page.tsx | 0 | 0 | 0 |
+| client/src/app/(main)/incidents/page.tsx | 0 | 0 | 0 |
+| client/src/app/(main)/incidents/report/page.tsx | 8 | 1 | 0 |
+| client/src/app/(main)/incidents/[id]/page.tsx | 12 | 0 | 0 |
+| client/src/app/(main)/layout.tsx | 0 | 0 | 0 |
+| client/src/app/(main)/map/page.tsx | 2 | 0 | 0 |
+| client/src/app/(main)/notifications/page.tsx | 2 | 0 | 0 |
+| client/src/app/(main)/resources/page.tsx | 25 | 3 | 3 |
+| client/src/app/(main)/shelters/page.tsx | 13 | 1 | 0 |
+| client/src/app/(main)/supplies/page.tsx | 31 | 5 | 1 |
+| client/src/app/(main)/volunteer-requests/page.tsx | 3 | 0 | 0 |
+| client/src/app/(main)/volunteers/page.tsx | 3 | 0 | 0 |
+| client/src/app/(main)/volunteers/tasks/page.tsx | 1 | 0 | 0 |
+| client/src/app/layout.tsx | 0 | 0 | 0 |
+| client/src/app/page.tsx | 0 | 0 | 0 |
+| client/src/app/providers.tsx | 0 | 0 | 0 |
+| client/src/components/incidents/IncidentBadges.tsx | 0 | 0 | 0 |
+| client/src/components/incidents/IncidentDashboard.tsx | 5 | 0 | 0 |
+| client/src/components/incidents/StatusTimeline.tsx | 0 | 0 | 0 |
+| client/src/components/layout/AppShell.tsx | 0 | 0 | 0 |
+| client/src/components/layout/AuthGuard.tsx | 0 | 0 | 0 |
+| client/src/components/layout/Footer.tsx | 0 | 0 | 0 |
+| client/src/components/layout/Navbar.tsx | 2 | 0 | 0 |
+| client/src/components/layout/NotificationMenu.tsx | 2 | 0 | 0 |
+| client/src/components/layout/Sidebar.tsx | 0 | 0 | 1 |
+| client/src/components/map/IncidentMarker.tsx | 0 | 0 | 0 |
+| client/src/components/map/LocationPicker.tsx | 1 | 0 | 0 |
+| client/src/components/map/MapContainer.tsx | 0 | 0 | 0 |
+| client/src/components/map/ShelterMarker.tsx | 0 | 0 | 0 |
+| client/src/components/ui/Badge.tsx | 0 | 0 | 0 |
+| client/src/components/ui/Button.tsx | 1 | 0 | 0 |
+| client/src/components/ui/Card.tsx | 0 | 0 | 0 |
+| client/src/components/ui/ErrorNotice.tsx | 1 | 0 | 0 |
+| client/src/components/ui/Modal.tsx | 1 | 0 | 1 |
+| client/src/components/ui/PasswordInput.tsx | 2 | 0 | 0 |
+| client/src/components/volunteers/AssignmentStatusBadge.tsx | 0 | 0 | 0 |
+| client/src/context/AuthContext.tsx | 0 | 0 | 0 |
+| client/src/context/SocketContext.tsx | 0 | 0 | 0 |

@@ -31,6 +31,10 @@ const SEVERITY_COLORS: Record<string, string> = {
   LOW: '#22c55e',
 };
 
+function ChartValues({rows}: {rows: {label: string; value: number}[]}) {
+  if (!rows.length) return <p className="text-sm text-slate-400 py-6">No records available for this chart yet.</p>;
+  return <details className="text-sm"><summary className="cursor-pointer text-amber-300">View chart data</summary><table className="w-full mt-2 text-left"><caption className="sr-only">Values shown in the chart above</caption><thead><tr><th scope="col" className="py-2">Group</th><th scope="col" className="py-2">Count</th></tr></thead><tbody>{rows.map(r=><tr key={r.label} className="border-t border-slate-800"><th scope="row" className="py-2 font-normal">{r.label}</th><td>{r.value}</td></tr>)}</tbody></table></details>;
+}
 export default function AnalyticsPage() {
   const router = useRouter();
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -116,7 +120,7 @@ export default function AnalyticsPage() {
         </div>
 
         <Button variant="ghost" loading={loading} onClick={() => loadData()} className="text-slate-400 hover:text-white border border-slate-800">
-          <RefreshCw size={14} className="mr-2" /> Refresh Telemetry
+          <RefreshCw size={14} className="mr-2" /> Refresh analytics
         </Button>
       </div>
 
@@ -150,9 +154,9 @@ export default function AnalyticsPage() {
               <Package size={24} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Resource Supply</p>
-              <h3 className="text-2xl font-bold text-white mt-0.5">{overview.availableResourceInventory}</h3>
-              <p className="text-[11px] text-emerald-300 font-medium">{overview.allocatedResourceInventory} Allocated to Active Tasks</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Inventory Lots</p>
+              <h3 className="text-2xl font-bold text-white mt-0.5">{overview.totalResources}</h3>
+              <p className="text-[11px] text-emerald-300 font-medium">Different units are tracked separately</p>
             </div>
           </Card>
 
@@ -170,7 +174,7 @@ export default function AnalyticsPage() {
       )}
 
       {loading ? (
-        <div className="py-20 text-center text-slate-400">Generating analytical models…</div>
+        <div className="py-20 text-center text-slate-400">Loading analytics…</div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Incidents by Category */}
@@ -179,7 +183,7 @@ export default function AnalyticsPage() {
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <BarChart3 className="text-orange-400" size={18} /> Incidents by Category
               </h3>
-              <div className="h-64">
+              {incidentTrends.byCategory.length > 0 && (<div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={incidentTrends.byCategory}>
                     <XAxis dataKey="category" stroke="#64748b" fontSize={11} />
@@ -190,7 +194,8 @@ export default function AnalyticsPage() {
                     <Bar dataKey="count" fill="#f97316" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
+              </div>)}
+              <ChartValues rows={incidentTrends.byCategory.map(r=>({label:r.category,value:r.count}))}/>
             </Card>
           )}
 
@@ -200,7 +205,7 @@ export default function AnalyticsPage() {
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <PieIcon className="text-orange-400" size={18} /> Severity Breakdown
               </h3>
-              <div className="h-64 flex items-center justify-center">
+              {incidentTrends.bySeverity.length > 0 && (<div className="h-64 flex items-center justify-center">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -222,7 +227,8 @@ export default function AnalyticsPage() {
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
-              </div>
+              </div>)}
+              <ChartValues rows={incidentTrends.bySeverity.map(r=>({label:r.severity,value:r.count}))}/>
             </Card>
           )}
 
@@ -230,21 +236,21 @@ export default function AnalyticsPage() {
           {resourceUtilization?.byCategory && (
             <Card className="bg-slate-900 border-slate-800 p-5 space-y-4">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Package className="text-emerald-400" size={18} /> Resource Inventory Breakdown
+                <Package className="text-emerald-400" size={18} /> Inventory Lots by Category
               </h3>
-              <div className="h-64">
+              {resourceUtilization.byCategory.length > 0 && (<div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={resourceUtilization.byCategory}>
                     <XAxis dataKey="category" stroke="#64748b" fontSize={11} />
-                    <YAxis stroke="#64748b" fontSize={11} />
+                    <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
                     <Tooltip itemStyle={{ color: '#f8fafc' }} labelStyle={{ color: '#f8fafc' }}
                       contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', color: '#fff' }}
                     />
-                    <Bar dataKey="availableQuantity" name="Available Qty" fill="#22c55e" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="allocatedQuantity" name="Allocated Qty" fill="#f97316" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="itemCount" name="Inventory lots" fill="#22c55e" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
+              </div>)}
+              <ChartValues rows={resourceUtilization.byCategory.map(r=>({label:r.category,value:r.itemCount}))}/>
             </Card>
           )}
 
@@ -254,7 +260,7 @@ export default function AnalyticsPage() {
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Users className="text-sky-400" size={18} /> Volunteer Request Distribution
               </h3>
-              <div className="h-64 flex items-center justify-center">
+              {volunteerActivity.requestsByStatus.length > 0 && (<div className="h-64 flex items-center justify-center">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -276,7 +282,8 @@ export default function AnalyticsPage() {
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
-              </div>
+              </div>)}
+              <ChartValues rows={volunteerActivity.requestsByStatus.map(r=>({label:r.status,value:r.count}))}/>
             </Card>
           )}
         </div>

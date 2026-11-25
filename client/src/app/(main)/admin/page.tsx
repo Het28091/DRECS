@@ -1,7 +1,7 @@
 'use client';
 import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ShieldAlert, Users, Search, UserCheck, UserX, Shield, Filter, RefreshCw, Activity } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -28,6 +28,8 @@ export default function AdminPage() {
     counts: { incidents: number; shelters: number; resources: number };
   } | null>(null);
 
+  const actionLock = useRef(false);
+  const [overviewError, setOverviewError] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -57,9 +59,9 @@ export default function AdminPage() {
   const fetchOverview = useCallback(async () => {
     try {
       const data = await getAdminOverview();
-      setSystemStats(data.systemStats);
+      setSystemStats(data.systemStats); setOverviewError('');
     } catch (err) {
-      setLoadError('Unable to load system overview. Refresh to retry.');
+      setOverviewError('Unable to load system overview. Refresh to retry.');
     }
   }, []);
 
@@ -73,8 +75,8 @@ export default function AdminPage() {
   }, [currentUser, fetchUsers, fetchOverview]);
 
   const handleRoleChange = async (userId: string, newRole: Role) => {
-    if (!confirm(`Are you sure you want to change this user's role to ${newRole}?`)) return;
-    setActionLoading(userId);
+    if (actionLock.current || !confirm(`Are you sure you want to change this user's role to ${newRole}?`)) return;
+    actionLock.current = true; setActionLoading(userId);
     try {
       await updateUserRole(userId, newRole);
       await fetchUsers();
@@ -82,7 +84,7 @@ export default function AdminPage() {
     } catch (err: any) {
       setLoadError(err.response?.data?.message || 'Failed to update role');
     } finally {
-      setActionLoading(null);
+      actionLock.current = false; setActionLoading(null);
     }
   };
 
@@ -111,6 +113,7 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
+      {overviewError && <ErrorNotice message={overviewError} onRetry={() => void fetchOverview()} />}
       {loadError && <ErrorNotice message={loadError} onRetry={() => void fetchUsers()} />}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -158,7 +161,7 @@ export default function AdminPage() {
       {/* Controls */}
       <Card className="p-4 bg-slate-900/80 border-slate-800 flex flex-wrap gap-3 items-center justify-between">
         <div className="flex flex-wrap items-center gap-3 flex-1">
-          <div className="relative min-w-[240px] flex-1">
+          <div className="relative min-w-0 w-full sm:w-auto sm:min-w-[200px] flex-1">
             <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
             <input
               type="text"
@@ -235,7 +238,7 @@ export default function AdminPage() {
                         ) : (
                           <select
                             aria-label={`Role for ${u.name}`} value={u.role}
-                            disabled={actionLoading === u.id}
+                            disabled={actionLoading !== null}
                             onChange={(e) => handleRoleChange(u.id, e.target.value as Role)}
                             className="bg-slate-800 text-xs font-semibold text-orange-400 border border-slate-700 rounded px-2 py-1 focus:outline-none focus:border-orange-500"
                           >

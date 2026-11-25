@@ -137,3 +137,9 @@ Run `npm test`, `npm run test:integration` and `npm run build` in server, and `n
 Regression coverage includes authority visibility, status guards, five-report quota, phone length, resource-category parity/creation, invalid resource bodies, approved-only analytics and 99% occupancy. Manually verify map and GPS error clearing, resource creation for each category, and two-account live refresh against a test database before deployment. MongoDB transactions and the active-offer unique index must be available; see README migration notes.
 
 Troubleshooting: 400 means invalid input (read field errors); 401 means sign-in required; 403 means insufficient role; 409 means a conflicting edit/duplicate; 429 means an incident or assistant quota/interval was reached. A remaining 500 needs the exact response and server log to diagnose; do not assume every resource failure was the category mismatch. Keep credentials and real personal data out of logs and screenshots.
+
+## Evaluator preparation and UI review — 8 October 2026
+
+See [Evaluator Guide](EVALUATOR_GUIDE.md) for requirements, architecture, feature purpose/working/pending status, data models, API roles, algorithms, engineering challenges, demo sequence and viva questions. [Function Inventory](FUNCTION_INVENTORY.md) indexes named source functions with file/line and call traces. [UI Review](UI_REVIEW.md) records the review scope and verification limits.
+
+Supply forms now use aligned action controls, prerequisite guidance and an optional existing-item selector. Unconfigured AI fields are disabled with a non-AI alternative. The map removes cleared selections. Inventory analytics displays lot counts instead of summing incompatible units, and charts expose readable data tables. Existing quantity aggregates in the API remain legacy values and must not be interpreted as a total physical supply across units.

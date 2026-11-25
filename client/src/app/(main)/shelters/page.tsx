@@ -1,7 +1,7 @@
 'use client';
 import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Home,
   MapPin,
@@ -14,6 +14,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/Button';
 import { Card, CardTitle } from '@/components/ui/Card';
+import { ErrorNotice } from '@/components/ui/ErrorNotice';
 import { Badge } from '@/components/ui/Badge';
 import {
   createShelter,
@@ -49,6 +50,8 @@ export default function SheltersPage() {
 
   const [shelters, setShelters] = useState<Shelter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const mutationLock = useRef(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -65,13 +68,13 @@ export default function SheltersPage() {
   const [status, setStatus] = useState<ShelterStatus>('ACTIVE');
 
   const load = useCallback(async (silent = false) => {
-    if (!silent) { setIsLoading(true); setError(null); }
+    if (!silent) { setIsLoading(true); setLoadError(null); }
     try {
       const data = await fetchShelters();
-      setShelters(data);
+      setShelters(data); setLoadError(null);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
-      setError(
+      setLoadError(
         axiosErr.response?.data?.message ||
           axiosErr.message ||
           'Failed to load shelters.',
@@ -102,6 +105,8 @@ export default function SheltersPage() {
   };
 
   const startEdit = (shelter: Shelter) => {
+    if (mutationLock.current) return;
+    setError(null);
     setEditingId(shelter.id);
     setShowForm(true);
     setName(shelter.name);
@@ -117,6 +122,7 @@ export default function SheltersPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (mutationLock.current) return;
     setError(null);
 
     const lat = Number(latitude);
@@ -156,7 +162,7 @@ export default function SheltersPage() {
       status,
     };
 
-    setIsSaving(true);
+    mutationLock.current = true; setIsSaving(true);
     try {
       if (editingId) {
         const updated = await updateShelter(editingId, payload);
@@ -174,12 +180,13 @@ export default function SheltersPage() {
           'Failed to save shelter.',
       );
     } finally {
-      setIsSaving(false);
+      mutationLock.current = false; setIsSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this shelter?')) return;
+    if (mutationLock.current || !window.confirm('Delete this shelter?')) return;
+    mutationLock.current = true; setIsSaving(true);
     setError(null);
     try {
       await deleteShelter(id);
@@ -192,7 +199,7 @@ export default function SheltersPage() {
           axiosErr.message ||
           'Failed to delete shelter.',
       );
-    }
+    } finally { mutationLock.current = false; setIsSaving(false); }
   };
 
   return (
@@ -212,6 +219,7 @@ export default function SheltersPage() {
 
         {isAuthority && (
           <Button
+            disabled={isSaving}
             variant={showForm ? 'outline' : 'primary'}
             size="md"
             onClick={() => {
@@ -235,8 +243,9 @@ export default function SheltersPage() {
         )}
       </div>
 
+      {loadError && <div className="mb-4"><ErrorNotice message={loadError} onRetry={() => void load()}/></div>}
       {error && (
-        <Card className="mb-4 border-red-800/60 text-red-400 text-sm">{error}</Card>
+        <div className="mb-4"><ErrorNotice message={error}/></div>
       )}
 
       {isAuthority && showForm && (
@@ -244,7 +253,7 @@ export default function SheltersPage() {
           <CardTitle className="mb-4">
             {editingId ? 'Edit Shelter' : 'Create Shelter'}
           </CardTitle>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} onChange={() => setError(null)} className="space-y-4"><fieldset disabled={isSaving} className="space-y-4"><legend className="sr-only">Shelter details</legend>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
                 <label htmlFor="shelter-name" className={labelClass}>
@@ -385,7 +394,7 @@ export default function SheltersPage() {
             <Button type="submit" variant="primary" loading={isSaving}>
               {editingId ? 'Save Changes' : 'Create Shelter'}
             </Button>
-          </form>
+          </fieldset></form>
         </Card>
       )}
 
@@ -400,7 +409,7 @@ export default function SheltersPage() {
         </div>
       )}
 
-      {!isLoading && shelters.length === 0 && (
+      {!isLoading && !loadError && shelters.length === 0 && (
         <Card className="text-center py-12 text-slate-400">
           No shelters available yet.
           {isAuthority && ' Create the first shelter to get started.'}
@@ -473,14 +482,14 @@ export default function SheltersPage() {
                         variant="outline"
                         size="sm"
                         className="flex-1"
-                        onClick={() => startEdit(shelter)}
+                        disabled={isSaving} onClick={() => startEdit(shelter)}
                       >
                         <Pencil size={13} /> Edit
                       </Button>
                       <Button
                         variant="danger"
                         size="sm"
-                        aria-label={`Delete ${shelter.name}`}
+                        disabled={isSaving} aria-label={`Delete ${shelter.name}`}
                         onClick={() => handleDelete(shelter.id)}
                       >
                         <Trash2 size={13} />

@@ -84,3 +84,9 @@ Controller tests do not replace integration testing against a disposable MongoDB
 ## Project reference
 
 See [Project Information](PROJECT_INFORMATION.md) for validation expressions, status effects, resource troubleshooting, and the implemented shelter supply workflow, optional AI configuration, and remaining roadmap.
+
+## Evaluator preparation and UI review — 8 October 2026
+
+See [Evaluator Guide](EVALUATOR_GUIDE.md) for requirements, architecture, feature purpose/working/pending status, data models, API roles, algorithms, engineering challenges, demo sequence and viva questions. [Function Inventory](FUNCTION_INVENTORY.md) indexes named source functions with file/line and call traces. [UI Review](UI_REVIEW.md) records the review scope and verification limits.
+
+Supply forms now use aligned action controls, prerequisite guidance and an optional existing-item selector. Unconfigured AI fields are disabled with a non-AI alternative. The map removes cleared selections. Inventory analytics displays lot counts instead of summing incompatible units, and charts expose readable data tables. Existing quantity aggregates in the API remain legacy values and must not be interpreted as a total physical supply across units.

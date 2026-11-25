@@ -24,13 +24,15 @@ export default function LocationPicker({ value, onChange }: {
     return () => { instance.remove(); map.current = null; marker.current = null; };
   }, []);
   useEffect(() => {
-    if (!map.current || !value) return;
+    if (!map.current) return;
+    if (!value) { marker.current?.remove(); marker.current = null; return; }
     if (marker.current) marker.current.setLatLng(value);
     else marker.current = L.circleMarker(value, { radius: 10, color: '#fff', fillColor: '#f97316', fillOpacity: 1 }).addTo(map.current);
     if (!map.current.getBounds().contains(value)) map.current.setView(value, 15);
   }, [value?.[0], value?.[1]]);
   return <div className="space-y-2">
-    <div ref={container} tabIndex={0} className="h-72 rounded-xl relative z-0" aria-label="Select incident location by clicking the map" />
+    <div ref={container} tabIndex={0} className="h-72 rounded-xl relative z-0" aria-label="Select location by clicking the map or using the map center" />
+    <p role="status" className="text-sm text-slate-300">{value ? 'Location selected. Click another point to change it.' : 'No location selected. Click the map or choose its center.'}</p>
     <p className="text-xs text-slate-400">Keyboard: focus the map and use arrow keys to pan, then select its center below.</p>
     <button type="button" className="rounded-lg border border-slate-600 px-3 py-2 text-sm hover:bg-slate-800" onClick={() => { const center = map.current?.getCenter(); if (center) onChange([center.lat, center.wrap().lng]); }}>Use map center</button>
   </div>;

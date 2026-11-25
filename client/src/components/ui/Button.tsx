@@ -13,7 +13,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variants: Record<Variant, string> = {
   primary:
-    'bg-amber-600 text-white hover:bg-amber-500 focus:ring-amber-500 border border-amber-500/30 font-semibold shadow-xs',
+    'bg-amber-400 text-slate-950 enabled:hover:bg-amber-300 focus:ring-amber-500 border border-amber-500/30 font-semibold shadow-xs',
   secondary:
     'bg-slate-800 text-slate-100 hover:bg-slate-700 focus:ring-slate-500 border border-slate-700 font-semibold',
   danger:
@@ -43,9 +43,9 @@ export function Button({
   return (
     <button type={type} aria-busy={loading || undefined}
       className={cn(
-        'inline-flex items-center justify-center rounded-md transition-all',
+        'inline-flex min-h-9 shrink-0 items-center justify-center self-start rounded-md transition-colors',
         'focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-slate-950',
-        'disabled:opacity-50 disabled:cursor-not-allowed',
+        'disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-400 disabled:border-slate-700 disabled:shadow-none',
         variants[variant],
         sizes[size],
         className,
