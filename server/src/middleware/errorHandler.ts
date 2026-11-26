@@ -18,15 +18,15 @@ export const errorHandler = (
   _next: NextFunction,
 ): void => {
   const conflict = err.name === 'VersionError' || (err as any).code === 11000;
-  const statusCode = conflict ? 409 : err.statusCode ?? 500;
-  const message = conflict ? 'This record changed or already exists. Refresh and try again.' : err.message || 'Internal Server Error';
+  const malformed = ['ValidationError', 'CastError', 'SyntaxError'].includes(err.name);
+  const statusCode = conflict ? 409 : malformed ? 400 : err.statusCode ?? 500;
+  const message = conflict ? 'This record changed or already exists. Refresh and try again.' : statusCode >= 500 ? 'Something went wrong. Please try again.' : malformed ? 'Invalid request data' : err.message || 'Request failed';
 
   console.error(`[${req.method}] ${req.path} → ${statusCode}: ${message}`);
 
   res.status(statusCode).json({
     success: false,
     message,
-    ...(env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 };
 

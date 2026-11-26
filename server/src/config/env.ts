@@ -4,8 +4,6 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const envSchema = z.object({
-  OPENAI_API_KEY: z.string().optional(),
-  OPENAI_MODEL: z.string().optional(),
   PORT: z.string().default('5000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   MONGODB_URI: z.string({ required_error: 'MONGODB_URI is required' }),
@@ -13,6 +11,8 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('7d'),
   CLIENT_URL: z.string().default('http://localhost:3000'),
   MAX_FILE_SIZE: z.string().default('5'),
+  GEMINI_API_KEY: z.string().trim().default(''),
+  GEMINI_MODEL: z.string().regex(/^gemini-[a-z0-9.-]+$/).default('gemini-3.1-flash-lite'),
 });
 
 const parsed = envSchema.safeParse(process.env);

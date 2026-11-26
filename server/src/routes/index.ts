@@ -1,3 +1,6 @@
+import { queryGuard } from '../middleware/queryGuard';
+import locationRoutes from './locationRoutes';
+import chatbotRoutes from './chatbotRoutes';
 import { Router } from 'express';
 import logisticsRoutes from './logisticsRoutes';
 import authRoutes from './authRoutes';
@@ -13,7 +16,10 @@ import analyticsRoutes from './analyticsRoutes';
 import adminRoutes from './adminRoutes';
 
 const router = Router();
+router.use(queryGuard);
 
+router.use('/locations', locationRoutes);
+router.use('/chatbot', chatbotRoutes);
 router.use('/logistics', logisticsRoutes);
 router.use('/auth', authRoutes);
 router.use('/incidents', incidentRoutes);

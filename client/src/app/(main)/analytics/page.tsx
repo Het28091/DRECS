@@ -165,9 +165,9 @@ export default function AnalyticsPage() {
               <Users size={24} />
             </div>
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Response Team</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Help offers</p>
               <h3 className="text-2xl font-bold text-white mt-0.5">{overview.activeAssignments}</h3>
-              <p className="text-[11px] text-sky-300 font-medium">Active Volunteer Assignments</p>
+              <p className="text-[11px] text-sky-300 font-medium">Offers on active incidents</p>
             </div>
           </Card>
         </div>

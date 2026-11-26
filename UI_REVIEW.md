@@ -1,109 +1,26 @@
-# DRECS UI and interaction review
+# Interface and Interaction Review
 
-Review date: 5 October 2026. Perspective: project management, usability and frontend quality.
+Updated: 26 November 2026.
 
-## Assessment
+## Shared design
 
-The core incident-to-response workflow is present. The main usability risks found in this pass were small controls with missing behaviour, mobile navigation taking over the content area, silent failures, and inconsistent dialog/keyboard behaviour. The fixes below improve these existing workflows. This is not a claim that every browser, role and real-database scenario has been exhaustively tested.
+The interface uses a restrained dark palette with amber primary actions, consistent card spacing, rounded controls and readable text. Navigation adapts between a persistent desktop sidebar and a mobile dialog. Content containers reserve space for the floating assistant. Labels describe user tasks rather than implementation details.
 
-## Fixed findings
+Shared buttons expose loading/disabled states. Inputs use visible keyboard focus and a consistent minimum height. Native dialogs provide titles, focus containment, Escape handling, focus restoration and scroll management. Reduced-motion preferences are respected. Map attribution remains visible.
 
-| Priority | Area | Finding and change |
-| --- | --- | --- |
-| P1 | Mobile shell | Fixed 240px sidebar squeezed all pages. Desktop keeps the sidebar; mobile now has a labelled navigation button and modal navigation. |
-| P1 | Dialogs | Resource overlays lacked focus management, Escape support and small-screen scrolling. They now use the shared native dialog, explicit Tab wrapping, focus restoration, scroll locking, an accessible title and a close control. Closing is blocked during a save. |
-| P1 | Failed loading | Resource, analytics, notification and user-list failures were console-only. Visible alerts and retry controls now explain failure. Empty resource/notification/user lists are suppressed after a failed initial load. |
-| P2 | Passwords | Login and registration now have labelled show/hide toggles, preserved input values, password-manager autocomplete, and submission guards. Toggle buttons cannot submit the form. |
-| P2 | Registration | Password requirements are visible before typing, rather than hiding the reason the submit button is disabled. Each rule has a screen-reader-readable met/not-met state. Name length and autocomplete match the API. Registration has its own page title. |
-| P2 | Authentication errors | Editing credentials clears obsolete error feedback; server field errors clear for the edited registration field. Alerts are announced. |
-| P2 | Resource edit | Replaced the misleading stock-status override with Automatic from stock / Maintenance. The former LOW_STOCK and DEPLETED choices were overwritten by server calculations. |
-| P2 | Resource forms | Connected labels to controls, named filters and icon-only edit/delete buttons, cleared old modal errors on reopening, and added mutation guards. Allocation is disabled when no approved active incident is available, with an explanation. |
-| P2 | Resource actions | Failed release/delete actions now show an error. Repeated resource mutations are disabled while a request is running. |
-| P2 | Notifications | Added keyboard-accessible Mark read buttons in place of mouse-only clickable cards; prevented overlapping mark operations; related-record links also mark the notification read. Notification links are restricted to local paths. |
-| P2 | Notification popup | Positioned the popup against the mobile viewport so it cannot extend off the left edge beside the header controls. |
-| P2 | Map refresh | Automatic refresh updates markers without recentering a map the user is exploring. Explicit refresh/center actions still fit markers. |
-| P2 | Map contrast | Popup text had dark inline colors on a dark background. Updated to readable light text. |
-| P2 | Map selection | Added Use map center and keyboard instructions so selecting a location does not require a mouse click. Leaflet arrow-key panning remains available. |
-| P2 | Stale validation | Incident title/description and offer-help errors clear when the corresponding field is edited; submission still validates all fields. Incident fields expose invalid/error associations. |
-| P2 | Recovery after refresh | Dashboard, map, request and task fetches clear stale errors after a successful recovery. |
-| P2 | Navigation semantics | Removed nested link/button controls in Dashboard and Volunteer Force, identified the active navigation link, and added Skip to content. |
-| P2 | Shared buttons | Default to type=button to avoid accidental form submission, and announce loading with aria-busy. Actual submit buttons retain explicit type=submit. |
-| P2 | Keyboard/motion | Added consistent visible focus outlines and reduced-motion styling. |
-| P3 | Copy/layout | Simplified analytics description, improved mobile auth padding and long-name truncation, and retained clear labels instead of icon-only actions. |
+## Workflow presentation
 
-P1 means a task can be blocked or misleading; P2 is a significant interaction/accessibility issue; P3 is polish.
+- Dashboard distinguishes incident verification from response status.
+- Help offers show availability and contact details without task-progress controls.
+- Private coordination keeps participant threads separate.
+- Shelter forms use search, device location and map selection; contact errors are explicit.
+- Inventory shows source availability and reservations. Shelter supplies use Needed, On the way and Available here sections.
+- Read-only incident maps omit editing controls.
+- The assistant provides a compact conversation, loading feedback, clear conversation control and a retryable error state. Responses render as text.
+- Login and registration use password visibility controls and POST form methods; credentials are not submitted in a fallback URL query.
 
-## Screen coverage
+## Verification scope
 
-Source review covered login, registration, the shared shell/header/sidebar, Dashboard and incident cards, incident details and offer-help, report form and location picker, map/popups, shelters, resources, volunteer requests, Volunteer Force, assigned tasks, notifications, analytics, and admin. The `/incidents` and `/incidents/my` pages are redirects. Shared buttons, cards and dialogs were also inspected.
+Both production builds passed. Browser inspection covered the sign-in layout, authenticated management dashboard and chatbot dialog. The chatbot's pending and failed-request states were observed; failed questions remain available for retry. Live provider calls separately returned concise answers.
 
-Browser verification uses `server/tests/ui-preview.cjs`, an isolated in-memory fixture with no connection to the real database. Login/show/hide, registration/show/hide and rule visibility, mobile Dashboard width (390px), mobile authority navigation, resource load-failure messaging, resource dialog labels and Escape/focus behaviour are the targeted checks. The fixture intentionally does not implement resource persistence, analytics or admin endpoints; those failures test the error UI, not live service availability.
-
-Production compilation includes all application pages, TypeScript and Next.js lint checks. Existing backend tests cover the previously implemented workflow rules. Browser geolocation permissions, actual account creation, screen-reader output, real inventory writes and cross-device synchronization still require an integration environment.
-
-## Remaining work and dependencies
-
-1. **P1 release gate: role-based integration walkthrough.** Use a seeded test MongoDB replica set with citizen, authority, volunteer-capable citizen and admin accounts. Verify review, assignment, stock, notification and concurrent-update flows in two browser sessions. This cannot be established by in-memory fixtures alone.
-2. **P2 request ordering.** Rapid filter changes and overlapping live refreshes should eventually use cancellation/request sequence guards consistently across list pages. Test delayed and out-of-order responses before declaring filter behaviour fully hardened.
-3. **P2 accessibility coverage.** Run a full screen-reader and keyboard review, including Leaflet controls, chart data alternatives, long translated content and 200% zoom. This pass improves known issues but is not a WCAG conformance audit.
-4. **P2 account recovery.** A real Forgot password flow requires server token expiry, one-time use, an email delivery service, rate limits and abuse tests. Do not add a decorative link without a working recovery flow.
-5. **P2 destructive-action consistency.** Existing browser confirmations remain for deletes and sensitive role changes. A future shared confirmation dialog can add affected-record details and consistent language; retaining a confirmation is preferable to removing it for visual polish.
-6. **P3 analytics clarity.** Add explicit chart empty states and accessible data tables. Mixed inventory units should not be presented as a meaningful single supply total; use per-unit breakdowns when extending analytics.
-
-## Supply workflow follow-up — 6 October 2026
-
-Implemented the Shelter Supplies screen and optional contextual assistant described in [Project Information](PROJECT_INFORMATION.md). A real-API browser walkthrough against a disposable MongoDB replica set verified reservation, dispatch, receipt and consumption (100 initial bottles → 40 at source + 40 at shelter + 20 consumed). Missing AI configuration displays a clear disabled state. Integration tests exercise concurrent reservations, rollback, duplicate actions, conservation and protected history. This adds meaningful database coverage without replacing the remaining full multi-role release walkthrough.
-
-Analytics tooltips now explicitly set light label/item colors against the dark background, including Severity Breakdown and Volunteer Request Distribution. Phone submission checks enforce Indian mobile prefixes and reject obvious placeholders on both client and server; ownership still requires future OTP verification.
-
-## Source inventory — 8 October 2026
-
-All 45 TSX source files were traversed for controls, forms and dialogs. Counts are static JSX occurrences (a mapped component can render many controls); this inventory is not a claim that every state was exercised in a browser. Shared components and targeted screens were reviewed and verified as described below.
-
-| Source | Controls | Forms | Dialogs |
-| --- | ---: | ---: | ---: |
-| client/src/app/(auth)/layout.tsx | 0 | 0 | 0 |
-| client/src/app/(auth)/login/page.tsx | 3 | 1 | 0 |
-| client/src/app/(auth)/register/layout.tsx | 0 | 0 | 0 |
-| client/src/app/(auth)/register/page.tsx | 4 | 1 | 0 |
-| client/src/app/(main)/admin/page.tsx | 6 | 0 | 0 |
-| client/src/app/(main)/analytics/page.tsx | 1 | 0 | 0 |
-| client/src/app/(main)/dashboard/page.tsx | 0 | 0 | 0 |
-| client/src/app/(main)/incidents/my/page.tsx | 0 | 0 | 0 |
-| client/src/app/(main)/incidents/page.tsx | 0 | 0 | 0 |
-| client/src/app/(main)/incidents/report/page.tsx | 8 | 1 | 0 |
-| client/src/app/(main)/incidents/[id]/page.tsx | 12 | 0 | 0 |
-| client/src/app/(main)/layout.tsx | 0 | 0 | 0 |
-| client/src/app/(main)/map/page.tsx | 2 | 0 | 0 |
-| client/src/app/(main)/notifications/page.tsx | 2 | 0 | 0 |
-| client/src/app/(main)/resources/page.tsx | 25 | 3 | 3 |
-| client/src/app/(main)/shelters/page.tsx | 13 | 1 | 0 |
-| client/src/app/(main)/supplies/page.tsx | 31 | 5 | 1 |
-| client/src/app/(main)/volunteer-requests/page.tsx | 3 | 0 | 0 |
-| client/src/app/(main)/volunteers/page.tsx | 3 | 0 | 0 |
-| client/src/app/(main)/volunteers/tasks/page.tsx | 1 | 0 | 0 |
-| client/src/app/layout.tsx | 0 | 0 | 0 |
-| client/src/app/page.tsx | 0 | 0 | 0 |
-| client/src/app/providers.tsx | 0 | 0 | 0 |
-| client/src/components/incidents/IncidentBadges.tsx | 0 | 0 | 0 |
-| client/src/components/incidents/IncidentDashboard.tsx | 5 | 0 | 0 |
-| client/src/components/incidents/StatusTimeline.tsx | 0 | 0 | 0 |
-| client/src/components/layout/AppShell.tsx | 0 | 0 | 0 |
-| client/src/components/layout/AuthGuard.tsx | 0 | 0 | 0 |
-| client/src/components/layout/Footer.tsx | 0 | 0 | 0 |
-| client/src/components/layout/Navbar.tsx | 2 | 0 | 0 |
-| client/src/components/layout/NotificationMenu.tsx | 2 | 0 | 0 |
-| client/src/components/layout/Sidebar.tsx | 0 | 0 | 1 |
-| client/src/components/map/IncidentMarker.tsx | 0 | 0 | 0 |
-| client/src/components/map/LocationPicker.tsx | 1 | 0 | 0 |
-| client/src/components/map/MapContainer.tsx | 0 | 0 | 0 |
-| client/src/components/map/ShelterMarker.tsx | 0 | 0 | 0 |
-| client/src/components/ui/Badge.tsx | 0 | 0 | 0 |
-| client/src/components/ui/Button.tsx | 1 | 0 | 0 |
-| client/src/components/ui/Card.tsx | 0 | 0 | 0 |
-| client/src/components/ui/ErrorNotice.tsx | 1 | 0 | 0 |
-| client/src/components/ui/Modal.tsx | 1 | 0 | 1 |
-| client/src/components/ui/PasswordInput.tsx | 2 | 0 | 0 |
-| client/src/components/volunteers/AssignmentStatusBadge.tsx | 0 | 0 | 0 |
-| client/src/context/AuthContext.tsx | 0 | 0 | 0 |
-| client/src/context/SocketContext.tsx | 0 | 0 | 0 |
+Full coverage across devices, screen readers and all role/page combinations remains future verification work. Shared-component changes improve consistency across screens but do not establish comprehensive accessibility compliance. Current automated coverage is documented in [the evaluator guide](EVALUATOR_GUIDE.md).

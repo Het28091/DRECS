@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { validateBody } from '../utils/validators';
 import { Router } from 'express';
 import {
   getAllUsers,
@@ -15,8 +17,8 @@ router.use(authenticate);
 router.use(roleGuard('admin'));
 
 router.get('/users', getAllUsers);
-router.patch('/users/:id/role', updateUserRole);
-router.patch('/users/:id/status', toggleUserStatus);
+router.patch('/users/:id/role', validateBody(z.object({ role: z.enum(['citizen','volunteer','authority','admin']) })), updateUserRole);
+router.patch('/users/:id/status', validateBody(z.object({ isActive: z.boolean() })), toggleUserStatus);
 router.get('/overview', getAdminOverview);
 
 export default router;

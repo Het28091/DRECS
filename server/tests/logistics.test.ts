@@ -4,7 +4,6 @@ process.env.NODE_ENV = 'test'; process.env.MONGODB_URI = 'mongodb://127.0.0.1:27
 const { isValidMobile } = require('../src/utils/phone');
 const { shortage, matchesNeed, distanceKm, assertTransferAction } = require('../src/utils/logisticsPolicy');
 const { reserveSchema, storageSchema, consumeSchema } = require('../src/utils/logisticsValidation');
-const { generateAnswer } = require('../src/controllers/assistantController');
 afterEach(() => mock.restoreAll());
 test('Indian mobile plausibility rejects invalid prefixes and common placeholders', () => {
   for (const phone of ['1234567890','5876543210','9876543210','6789012345','9999999999','9898989898','9123491234','+919815263740','98152637400','abcdef1234']) assert.equal(isValidMobile(phone), false, phone);
@@ -32,16 +31,4 @@ test('write schemas reject fractions, oversized quantities, invalid references a
   for (const quantity of [0,-1,1.1,Infinity,1000000001]) assert.equal(reserveSchema.safeParse({...body,quantity}).success,false);
   assert.equal(consumeSchema.safeParse({stockId:body.needId,quantity:1,requestKey:body.requestKey,notes:''}).success,false);
   assert.equal(storageSchema.safeParse({name:'Warehouse',kind:'WAREHOUSE',address:'Main road',latitude:91,longitude:72}).success,false);
-});
-test('AI request has no tools, does not store responses, and extracts text without executing content', async () => {
-  let sent: any;
-  mock.method(globalThis, 'fetch', async (_url: string, options: any) => { sent=JSON.parse(options.body); return {ok:true,json:async()=>({status:'completed',output:[{type:'message',content:[{type:'output_text',text:'Review 20 bottles.'}]}]})}; });
-  assert.equal(await generateAnswer('Help allocate water',{shortage:20}),'Review 20 bottles.');
-  assert.equal(sent.store,false); assert.equal(sent.tools,undefined); assert.equal(sent.max_output_tokens,1800);
-});
-test('AI provider errors and incomplete responses return controlled errors', async () => {
-  const fetch = mock.method(globalThis,'fetch',async()=>({ok:false,status:401}));
-  await assert.rejects(()=>generateAnswer('help',{}), {statusCode:503});
-  fetch.mock.mockImplementation(async()=>({ok:true,json:async()=>({status:'incomplete',output:[]})}));
-  await assert.rejects(()=>generateAnswer('help',{}), {statusCode:503});
 });

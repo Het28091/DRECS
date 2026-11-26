@@ -49,7 +49,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="bg-slate-800 border border-slate-700/80 rounded-2xl p-5 sm:p-8 shadow-2xl">
+    <div className="">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white mb-1.5">Sign In</h1>
         <p className="text-slate-400 text-sm">
@@ -64,7 +64,7 @@ export default function LoginPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form method="post" onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label htmlFor="email" className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
             Email Address

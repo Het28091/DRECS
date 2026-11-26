@@ -26,7 +26,7 @@ export const getAllUsers = asyncHandler(async (req: AuthRequest, res: Response) 
     filter.isActive = req.query.isActive === 'true';
   }
   if (typeof req.query.search === 'string' && req.query.search.trim()) {
-    const searchRegex = new RegExp(req.query.search.trim(), 'i');
+    const searchRegex = new RegExp(req.query.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     filter.$or = [{ name: searchRegex }, { email: searchRegex }];
   }
 

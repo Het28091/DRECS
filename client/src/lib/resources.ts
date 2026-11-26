@@ -12,6 +12,7 @@ export const getResourceById = async (id: string) => {
 };
 
 export const createResource = async (data: {
+  storageId?: string;
   name: string;
   category: string;
   quantity: number;

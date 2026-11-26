@@ -1,3 +1,5 @@
+import { StorageLocation } from '../models/Logistics';
+import { Shelter } from '../models/Shelter';
 import { canOfferHelp } from '../utils/incidentPolicy';
 import { Response } from 'express';
 import { Types } from 'mongoose';
@@ -104,16 +106,16 @@ export const createResource = asyncHandler(async (req: AuthRequest, res: Respons
     throw createError('Quantity must be a positive number', 400);
   }
 
-  const resource = await Resource.create({
-    name,
-    category,
-    quantity: numQuantity,
-    availableQuantity: numQuantity,
-    unit,
-    location,
-    status,
-    allocations: [],
-  });
+  const create = (storage?: any, session?: any) => Resource.create([{ name, category, quantity: numQuantity, availableQuantity: numQuantity, unit, location: storage ? { latitude: storage.latitude, longitude: storage.longitude, address: storage.address } : location, status, allocations: [], ...(storage && { storageId: storage._id, logisticsLinked: true }) }], session ? { session } : {}).then(rows => rows[0]);
+  const resource = req.body.storageId ? await Resource.db.transaction(async session => {
+    const storage = await StorageLocation.findById(req.body.storageId).session(session);
+    if (!storage) throw createError('Choose an existing storage location', 400);
+    if (storage.shelterId) {
+      const shelter = await Shelter.findOneAndUpdate({ _id: storage.shelterId, status: { $ne: 'INACTIVE' } }, { $set: { logisticsLinked: true }, $inc: { __v: 1 } }, { session });
+      if (!shelter) throw createError('Source shelter is inactive', 409);
+    }
+    return create(storage, session);
+  }) : await create();
 
   res.status(201).json({
     success: true,
@@ -220,39 +222,21 @@ export const allocateResource = asyncHandler(async (req: AuthRequest, res: Respo
     throw createError('Invalid incident ID', 400);
   }
 
-  const incident = await Incident.findById(incidentId);
-  if (!incident) {
-    throw createError('Incident not found', 404);
-  }
-
-  const resource = await Resource.findById(req.params.id);
-  if (!resource) {
-    throw createError('Resource not found', 404);
-  }
-
-  if (!canOfferHelp(incident)) throw createError('Resources can only be allocated to approved, active incidents', 400);
-  if (resource.status === 'MAINTENANCE') throw createError('Resource is under maintenance', 400);
   const allocQty = Number(quantity);
-  if (!Number.isFinite(allocQty) || allocQty <= 0) {
-    throw createError('Allocation quantity must be greater than 0', 400);
-  }
-
-  if (allocQty > resource.availableQuantity) {
-    throw createError(
-      `Insufficient inventory. Requested: ${allocQty}, Available: ${resource.availableQuantity}`,
-      400,
-    );
-  }
-
-  resource.availableQuantity -= allocQty;
-  resource.allocations.push({
-    incidentId: new Types.ObjectId(incidentId),
-    quantity: allocQty,
-    allocatedAt: new Date(),
-    notes: notes ?? '',
+  const { resource, incident } = await Resource.db.transaction(async session => {
+    const incident = await Incident.findById(incidentId).session(session);
+    if (!incident || !(incident.approvalStatus !== 'REJECTED' && !['RESOLVED','CLOSED'].includes(incident.status))) throw createError('Resources require an active incident', 409);
+    const resource = await Resource.findById(req.params.id).session(session);
+    if (!resource) throw createError('Resource not found', 404);
+    if (resource.status === 'MAINTENANCE') throw createError('Resource is under maintenance', 409);
+    if (!Number.isSafeInteger(allocQty) || allocQty <= 0 || allocQty > resource.availableQuantity) throw createError('Insufficient stock or invalid quantity', 409);
+    // One allocation per incident/item. Explicit release is required before replacing it.
+    if (resource.allocations.some(a => String(a.incidentId) === incidentId)) throw createError('This incident already has an allocation of this item', 409);
+    resource.availableQuantity -= allocQty;
+    resource.allocations.push({ incidentId: new Types.ObjectId(incidentId), quantity: allocQty, allocatedAt: new Date(), notes: notes || '' });
+    await resource.save({ session }); incident.updatedAt = new Date(); await incident.save({ session });
+    return { resource, incident };
   });
-
-  await resource.save();
 
   // Trigger notification
   await dispatchNotificationToRoles({

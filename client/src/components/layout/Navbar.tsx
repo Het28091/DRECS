@@ -21,15 +21,15 @@ export function Navbar({ onMenuToggle, menuOpen }: { onMenuToggle: () => void; m
   };
 
   return (
-    <header className="h-14 bg-slate-900 border-b border-slate-800 text-white flex items-center px-2 sm:px-5 gap-2 justify-between fixed top-0 left-0 right-0 z-40 shadow-xs">
+    <header className="h-16 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 text-white flex items-center px-2 sm:px-5 gap-2 justify-between fixed top-0 left-0 right-0 z-40 shadow-xs">
       <button type="button" onClick={onMenuToggle} aria-label="Open navigation" aria-expanded={menuOpen} className="md:hidden p-2 rounded hover:bg-slate-800"><Menu size={22} /></button>
       {/* Brand */}
       <Link href="/dashboard" className="flex items-center gap-2 group">
-        <div className="p-1 rounded bg-amber-600 text-white">
+        <div className="p-2 rounded-xl bg-amber-500 text-white">
           <Shield size={18} />
         </div>
-        <span className="font-bold text-base tracking-wider uppercase text-white font-mono">
-          DRECS <span className="hidden sm:inline text-[10px] bg-amber-600/30 text-amber-300 px-1.5 py-0.5 rounded uppercase ml-1 border border-amber-500/30">Console</span>
+        <span className="font-bold text-base tracking-tight text-white">
+          DRECS <span className="hidden lg:inline text-xs font-normal text-slate-400 ml-3">Disaster response & coordination</span>
         </span>
       </Link>
 
@@ -44,7 +44,7 @@ export function Navbar({ onMenuToggle, menuOpen }: { onMenuToggle: () => void; m
           <span className="font-medium hidden sm:block max-w-40 truncate">{displayName}</span>
           {user?.role && (
             <span className="text-[10px] font-mono uppercase bg-slate-700 px-1 rounded text-amber-300">
-              {user.role}
+              {user.role === 'authority' ? 'Management' : user.role === 'admin' ? 'Administrator' : user.role === 'volunteer' ? 'Volunteer' : 'Citizen'}
             </span>
           )}
         </div>

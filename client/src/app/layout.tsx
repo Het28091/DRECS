@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     default: 'DRECS — Disaster Response & Emergency Coordination System',
   },
   description:
-    'A real-time enterprise platform connecting citizens, volunteers, and authorities during disaster events.',
+    'Coordinate incident reports, volunteer support, shelters and emergency supplies.',
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',

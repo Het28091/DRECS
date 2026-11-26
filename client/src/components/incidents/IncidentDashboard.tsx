@@ -45,7 +45,7 @@ function IncidentCard({ incident, isAuthority }: { incident: Incident; isAuthori
           <div className="flex flex-wrap items-center gap-2 mb-1.5">
             <h2 className="text-base font-semibold text-white">{incident.title}</h2>
             <StatusBadge status={incident.status} />
-            {incident.approvalStatus !== 'APPROVED' && <span className="text-xs rounded-full px-2 py-1 bg-amber-500/10 text-amber-300">{incident.approvalStatus === 'REJECTED' ? 'Report rejected' : 'Awaiting approval'}</span>}
+            {incident.approvalStatus !== 'APPROVED' && <span className="text-xs rounded-full px-2 py-1 bg-amber-500/10 text-amber-300">{incident.approvalStatus === 'REJECTED' ? 'Report rejected' : 'Awaiting verification'}</span>}
             <SeverityBadge severity={incident.severity} />
           </div>
           <p className="text-sm text-slate-400 mb-2 line-clamp-2">{incident.description}</p>
@@ -62,7 +62,7 @@ function IncidentCard({ incident, isAuthority }: { incident: Incident; isAuthori
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Link href={`/incidents/${incident.id}`} className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm text-white hover:bg-slate-800">
-              View Details
+              View details
             </Link>
         </div>
       </div>
@@ -174,7 +174,7 @@ export default function IncidentsPage() {
         {!isAuthority && (
           <Link href="/incidents/report" className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm text-white hover:bg-slate-800">
               <PlusCircle size={16} />
-              Report Incident
+              Report incident
             </Link>
         )}
       </div>
@@ -186,7 +186,7 @@ export default function IncidentsPage() {
         </div>
         <div className="flex flex-wrap gap-3">
           {isAuthority && <select aria-label="Filter by approval" value={approvalFilter} onChange={e => setApprovalFilter(e.target.value)} className={selectClass}>
-            <option value="">All reviews</option><option value="PENDING">Awaiting approval</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option>
+            <option value="">All reviews</option><option value="PENDING">Awaiting verification</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option>
           </select>}
           <select
             aria-label="Filter incidents by status" value={statusFilter}
@@ -196,7 +196,7 @@ export default function IncidentsPage() {
             <option value="">All statuses</option>
             {INCIDENT_STATUSES.map((s) => (
               <option key={s} value={s}>
-                {s.replace(/_/g, ' ')}
+                {s === 'IN_PROGRESS' ? 'Response ongoing' : s === 'ASSIGNED' ? 'Under review' : s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ')}
               </option>
             ))}
           </select>
@@ -247,7 +247,7 @@ export default function IncidentsPage() {
         <div className="space-y-8">
           {myIncidents.length > 0 && (
             <section>
-              <h2 className="text-lg font-semibold text-white mb-3">My Reported Incidents</h2>
+              <h2 className="text-lg font-semibold text-white mb-3">My reported incidents</h2>
               <div className="space-y-3">
                 {myIncidents.map((incident) => (
                   <IncidentCard key={incident.id} incident={incident} isAuthority={false} />
@@ -257,7 +257,7 @@ export default function IncidentsPage() {
           )}
 
           <section>
-            <h2 className="text-lg font-semibold text-white mb-3">{statusFilter ? 'Community Incidents' : 'Other Active Incidents'}</h2>
+            <h2 className="text-lg font-semibold text-white mb-3">{statusFilter ? 'Community incidents' : 'Other active incidents'}</h2>
             {otherIncidents.length === 0 ? (
               <Card className="text-center py-8 text-slate-400">
                 No other incidents reported by the community right now.

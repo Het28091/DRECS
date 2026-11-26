@@ -53,7 +53,7 @@ export const getOverviewStats = asyncHandler(async (_req: AuthRequest, res: Resp
       },
     ]),
     User.countDocuments({ role: { $in: ['volunteer', 'citizen'] } }),
-    Assignment.countDocuments({ status: { $in: ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'] } }),
+    VolunteerRequest.aggregate([{ $match: { status: { $in: ['PENDING','APPROVED'] } } }, { $lookup: { from: 'incidents', localField: 'incidentId', foreignField: '_id', as: 'incident' } }, { $match: { 'incident.approvalStatus': 'APPROVED', 'incident.status': { $in: ['UNDER_REVIEW','ASSIGNED','IN_PROGRESS'] } } }, { $count: 'count' }]).then(rows => rows[0]?.count || 0),
   ]);
 
   const shelterStats = shelterAgg[0] ?? { totalCapacity: 0, totalOccupancy: 0 };
@@ -80,7 +80,8 @@ export const getOverviewStats = asyncHandler(async (_req: AuthRequest, res: Resp
       availableResourceInventory: resourceStats.totalAvailable,
       allocatedResourceInventory: resourceStats.totalInventory - resourceStats.totalAvailable,
       totalVolunteers,
-      activeAssignments,
+      activeAssignments, // Compatibility field: now counts help offers on active incidents.
+      activeOffers: activeAssignments,
     },
   });
 });
@@ -132,7 +133,7 @@ export const getVolunteerActivity = asyncHandler(async (_req: AuthRequest, res: 
 
   res.status(200).json({
     success: true,
-    requestsByStatus: requestsByStatus.map((item) => ({ status: item._id, count: item.count })),
+    requestsByStatus: requestsByStatus.map((item) => ({ status: ({ PENDING: 'Available (legacy)', APPROVED: 'Shared with management', REJECTED: 'Historical rejection', WITHDRAWN: 'Withdrawn' } as Record<string,string>)[item._id] || item._id, count: item.count })),
     assignmentsByStatus: assignmentsByStatus.map((item) => ({ status: item._id, count: item.count })),
   });
 });

@@ -1,4 +1,6 @@
 'use client';
+import { isValidContact, normalizeContact } from '@/lib/phone';
+import ShelterLocation from '@/components/map/ShelterLocation';
 import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
@@ -131,12 +133,12 @@ export default function SheltersPage() {
     const occ = Number(occupancy);
 
     if (!name.trim() || !contactInfo.trim() || latitude === '' || longitude === '' || capacity === '') {
-      setError('Please fill in all required fields.');
+      setError('Fill the required fields and select the shelter location on the map.');
       return;
     }
 
-    if (Number.isNaN(lat) || Number.isNaN(lng) || Number.isNaN(cap) || Number.isNaN(occ)) {
-      setError('Latitude, longitude, capacity, and occupancy must be valid numbers.');
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180 || !Number.isSafeInteger(cap) || cap < 1 || cap > 1000000 || !Number.isSafeInteger(occ) || occ < 0 || occupancy.trim() === '') {
+      setError('Select a valid location and enter whole-number capacity and occupancy within the allowed limits.');
       return;
     }
 
@@ -144,6 +146,8 @@ export default function SheltersPage() {
       setError('Occupancy cannot exceed capacity.');
       return;
     }
+
+    if (!isValidContact(contactInfo)) { setError('Enter a valid Indian mobile number (optionally +91) or an email address.'); return; }
 
     const payload = {
       name: name.trim(),
@@ -158,7 +162,7 @@ export default function SheltersPage() {
         .split(',')
         .map((f) => f.trim())
         .filter(Boolean),
-      contactInfo: contactInfo.trim(),
+      contactInfo: normalizeContact(contactInfo),
       status,
     };
 
@@ -175,9 +179,7 @@ export default function SheltersPage() {
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } }; message?: string };
       setError(
-        axiosErr.response?.data?.message ||
-          axiosErr.message ||
-          'Failed to save shelter.',
+        Object.values((axiosErr.response?.data as { errors?: Record<string, string[]> })?.errors || {}).flat().join(' ') || axiosErr.response?.data?.message || axiosErr.message || 'Failed to save shelter.',
       );
     } finally {
       mutationLock.current = false; setIsSaving(false);
@@ -261,6 +263,7 @@ export default function SheltersPage() {
                 </label>
                 <input
                   id="shelter-name"
+                  minLength={2} maxLength={120}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className={inputClass}
@@ -299,37 +302,7 @@ export default function SheltersPage() {
                 />
               </div>
 
-              <div>
-                <label htmlFor="shelter-lat" className={labelClass}>
-                  Latitude
-                </label>
-                <input
-                  id="shelter-lat"
-                  type="number"
-                  step="any"
-                  value={latitude}
-                  onChange={(e) => setLatitude(e.target.value)}
-                  className={inputClass}
-                  placeholder="23.0225"
-                  required
-                />
-              </div>
-
-              <div>
-                <label htmlFor="shelter-lng" className={labelClass}>
-                  Longitude
-                </label>
-                <input
-                  id="shelter-lng"
-                  type="number"
-                  step="any"
-                  value={longitude}
-                  onChange={(e) => setLongitude(e.target.value)}
-                  className={inputClass}
-                  placeholder="72.5714"
-                  required
-                />
-              </div>
+              <div className="sm:col-span-2"><ShelterLocation key={editingId || 'new'} value={latitude !== '' && longitude !== '' ? [Number(latitude), Number(longitude)] : null} onChange={(point, selectedAddress) => { setLatitude(String(point[0])); setLongitude(String(point[1])); setAddress(selectedAddress); setError(null); }}/></div>
 
               <div className="sm:col-span-2">
                 <label htmlFor="shelter-address" className={labelClass}>
@@ -337,6 +310,7 @@ export default function SheltersPage() {
                 </label>
                 <input
                   id="shelter-address"
+                  maxLength={300}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   className={inputClass}
@@ -346,10 +320,11 @@ export default function SheltersPage() {
 
               <div>
                 <label htmlFor="shelter-contact" className={labelClass}>
-                  Contact Info
+                  Contact mobile or email
                 </label>
                 <input
                   id="shelter-contact"
+                  minLength={3} maxLength={200}
                   value={contactInfo}
                   onChange={(e) => setContactInfo(e.target.value)}
                   className={inputClass}

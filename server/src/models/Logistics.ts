@@ -10,16 +10,19 @@ const storageSchema = new Schema({
 }, options);
 export const StorageLocation = model('StorageLocation', storageSchema);
 const needSchema = new Schema({
+  requestKey: { type: String },
   shelterId: ref('Shelter'), item: { type: String, required: true }, category: { type: String, required: true }, unit: { type: String, required: true },
   requested: count, committed: { ...count, default: 0 }, fulfilled: { ...count, default: 0 },
   urgency: { type: String, enum: ['NORMAL', 'HIGH', 'CRITICAL'], default: 'NORMAL' },
   notes: { type: String, maxlength: 500 }, createdBy: ref('User'),
 }, options);
+needSchema.index({createdBy:1,requestKey:1},{unique:true,partialFilterExpression:{requestKey:{$type:'string'}}});
 export const ShelterNeed = model('ShelterNeed', needSchema);
 const transferSchema = new Schema({
   needId: ref('ShelterNeed'), resourceId: ref('Resource'), storageId: ref('StorageLocation'), shelterId: ref('Shelter'),
-  quantity: { ...count, min: 1 }, status: { type: String, enum: ['RESERVED', 'DISPATCHED', 'RECEIVED', 'CANCELLED'], default: 'RESERVED' },
+  quantity: { ...count, min: 1 }, status: { type: String, enum: ['RESERVED', 'DISPATCHED', 'RECEIVED', 'CANCELLED', 'SETTLED'], default: 'RESERVED' },
   requestKey: { type: String, required: true }, createdBy: ref('User'),
+  sendNow: { type: Boolean, default: false }, receivedQuantity: { ...count, default: 0 }, returnedQuantity: { ...count, default: 0 }, damagedQuantity: { ...count, default: 0 },
   dispatchedAt: Date, receivedAt: Date, cancelledAt: Date,
 }, options);
 transferSchema.index({ createdBy: 1, requestKey: 1 }, { unique: true });
@@ -28,7 +31,7 @@ const balanceSchema = new Schema({ shelterId: ref('Shelter'), resourceId: ref('R
 balanceSchema.index({ shelterId: 1, resourceId: 1 }, { unique: true });
 export const ShelterStock = model('ShelterStock', balanceSchema);
 const ledgerSchema = new Schema({
-  action: { type: String, enum: ['RESERVED', 'DISPATCHED', 'RECEIVED', 'CANCELLED', 'CONSUMED'], required: true },
+  action: { type: String, enum: ['RESERVED', 'DISPATCHED', 'RECEIVED', 'CANCELLED', 'CONSUMED', 'RETURNED', 'DAMAGED'], required: true },
   resourceId: ref('Resource'), shelterId: ref('Shelter'), transferId: { type: Schema.Types.ObjectId, ref: 'SupplyTransfer' },
   quantity: { ...count, min: 1 }, actorId: ref('User'), requestKey: { type: String, required: true, unique: true }, notes: { type: String, maxlength: 500 },
 }, { timestamps: true });

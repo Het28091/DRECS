@@ -1,12 +1,13 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-export const VOLUNTEER_REQUEST_STATUSES = ['PENDING', 'APPROVED', 'REJECTED'] as const;
+export const VOLUNTEER_REQUEST_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN'] as const;
 export type VolunteerRequestStatus = (typeof VOLUNTEER_REQUEST_STATUSES)[number];
 
 export interface IVolunteerRequest {
   userId: Types.ObjectId;
   incidentId: Types.ObjectId;
   skills: string[];
+  availability: string;
   experience: string;
   message: string;
   phoneNumber: string;
@@ -33,6 +34,7 @@ const volunteerRequestSchema = new Schema<IVolunteerRequestDocument>(
       required: [true, 'Incident is required'],
       index: true,
     },
+    availability: { type: String, maxlength: 200, default: '' },
     skills: {
       type: [String],
       default: [],

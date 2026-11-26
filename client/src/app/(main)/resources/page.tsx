@@ -1,4 +1,6 @@
 'use client';
+import { StorageManager } from '@/components/StorageManager';
+import { getLogistics, Storage } from '@/lib/logistics';
 import { useLiveRefresh } from '@/hooks/useLiveRefresh';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -18,6 +20,8 @@ export default function ResourcesPage() {
   const { user } = useAuth();
   const isAuthorityOrAdmin = user?.role === 'authority' || user?.role === 'admin';
 
+  const [storage, setStorage] = useState<Storage[]>([]);
+  const [selectedStorage, setSelectedStorage] = useState('');
   const [resources, setResources] = useState<Resource[]>([]);
   const [incidents, setIncidents] = useState<{ id: string; title: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,8 +71,9 @@ export default function ResourcesPage() {
       setResources(data.resources || []);
       setLoadError('');
       if (isAuthorityOrAdmin) {
+        const logistics = await getLogistics(); setStorage(logistics.storage);
         const data = await getAllIncidents();
-        setIncidents(data.incidents.filter(i => i.approvalStatus === 'APPROVED' && ['UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS'].includes(i.status)).map(i => ({ id: i.id, title: i.title })));
+        setIncidents(data.incidents.filter(i => i.approvalStatus !== 'REJECTED' && ['REPORTED','UNDER_REVIEW', 'ASSIGNED', 'IN_PROGRESS'].includes(i.status)).map(i => ({ id: i.id, title: i.title })));
       }
     } catch (err) {
       setLoadError('Unable to load this page. Check your connection and retry.');
@@ -90,18 +95,20 @@ export default function ResourcesPage() {
     setSubmitting(true);
     setErrorMsg('');
     try {
+      if (!selectedStorage) throw new Error('Choose a storage location. Create one in Storage locations first.');
       await createResource({
+        storageId: selectedStorage,
         name: formData.name,
         category: formData.category,
         quantity: Number(formData.quantity),
         unit: formData.unit,
-        location: formData.locationAddress ? { address: formData.locationAddress } : undefined,
+
       });
       setShowCreateModal(false);
       setFormData({ name: '', category: RESOURCE_CATEGORIES[0], quantity: 100, unit: 'units', locationAddress: '' });
       await fetchResources();
     } catch (err: any) {
-      setErrorMsg(Object.values(err.response?.data?.errors || {}).flat().join(' ') || err.response?.data?.message || 'Failed to create resource');
+      setErrorMsg(Object.values(err.response?.data?.errors || {}).flat().join(' ') || err.response?.data?.message || err.message || 'Failed to create resource');
     } finally {
       setSubmitting(false);
     }
@@ -153,7 +160,7 @@ export default function ResourcesPage() {
   const handleRelease = async (resourceId: string, incidentId: string) => {
     if (submitting) return;
     setActionError('');
-    if (!confirm('Are you sure you want to release this resource allocation?')) return;
+    if (!confirm('Are you sure you want to release this resource reservation?')) return;
     try {
       setSubmitting(true);
       await releaseResource(resourceId, { incidentId });
@@ -201,7 +208,7 @@ export default function ResourcesPage() {
             Emergency Resource Inventory
           </h1>
           <p className="text-slate-400 text-sm mt-1">
-            Track disaster supplies, emergency equipment, and allocation dispatches.
+            Track disaster supplies, emergency equipment, and incident reservations.
           </p>
         </div>
 
@@ -266,7 +273,7 @@ export default function ResourcesPage() {
                       <span className="text-xs text-orange-400 font-semibold uppercase tracking-wider block mb-0.5">
                         {item.category}
                       </span>
-                      <h3 className="text-lg font-bold text-white">{item.name}</h3>
+                      <h3 className="text-lg font-bold text-white">{item.name}</h3><p className="text-xs text-slate-400">{item.location?.address || 'No source location'} · Reserved for shelters: {item.shelterReserved || 0} {item.unit}</p>
                     </div>
                     {getStatusBadge(item.status)}
                   </div>
@@ -304,7 +311,7 @@ export default function ResourcesPage() {
                   {/* Allocations list */}
                   {item.allocations && item.allocations.length > 0 && (
                     <div className="mt-4 pt-3 border-t border-slate-800/80 space-y-2">
-                      <p className="text-xs text-slate-400 font-semibold">Active Incident Allocations:</p>
+                      <p className="text-xs text-slate-400 font-semibold">Reserved for incidents:</p>
                       {item.allocations.map((alloc, idx) => (
                         <div key={idx} className="flex items-center justify-between text-xs bg-slate-800/60 p-2 rounded border border-slate-800">
                           <div>
@@ -335,7 +342,7 @@ export default function ResourcesPage() {
                   <div className="mt-5 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
                     <Button
                       size="sm"
-                      disabled={submitting || !incidents.length || !isAvailable || item.availableQuantity <= 0} title={!incidents.length ? 'No approved active incidents available' : 'Allocate to an incident'}
+                      disabled={submitting || !incidents.length || !isAvailable || item.availableQuantity <= 0} title={!incidents.length ? 'No active incidents available' : 'Reserve for an incident'}
                       onClick={() => {
                         setErrorMsg(''); setShowAllocateModal(item);
                         setAllocateData({ incidentId: incidents[0]?.id || '', quantity: Math.min(10, item.availableQuantity), notes: '' });
@@ -377,13 +384,14 @@ export default function ResourcesPage() {
         </div>
       )}
 
+      {isAuthorityOrAdmin && <StorageManager resources={resources} onChange={() => void fetchResources(true)}/>}
       {/* Modal: Create Resource */}
       {showCreateModal && (
         <Modal isOpen={Boolean(showCreateModal)} onClose={() => setShowCreateModal(false)} title="Add emergency resource" busy={submitting}>
 
             {errorMsg && <p role="alert" className="text-xs text-rose-400 bg-rose-950/50 p-2 rounded border border-rose-800">{errorMsg}</p>}
 
-            <form onSubmit={handleCreateSubmit} className="space-y-3">
+            <form onSubmit={handleCreateSubmit} className="space-y-3"><label className="block text-sm">Storage location<select required className="w-full rounded-lg bg-slate-800 p-2 mt-1" value={selectedStorage} onChange={e => setSelectedStorage(e.target.value)}><option value="">Select source location</option>{storage.map(s => <option key={s._id} value={s._id}>{s.name} · {s.address}</option>)}</select></label>{!storage.length && <p className="text-amber-300 text-sm">Close this form and add a location under Storage locations first.</p>}
               <div>
                 <label htmlFor="resource-field-1" className="block text-xs font-semibold text-slate-300 mb-1">Resource Item Name</label>
                 <input id="resource-field-1"
@@ -436,17 +444,7 @@ export default function ResourcesPage() {
                 />
               </div>
 
-              <div>
-                <label htmlFor="resource-field-5" className="block text-xs font-semibold text-slate-300 mb-1">Storage location (optional)</label>
-                <p className="text-xs text-slate-400 mb-2">Optional address for this lot. After creating it, open Shelter Supplies → Storage to link a warehouse or shelter and manage deliveries.</p>
-                <input id="resource-field-5"
-                  type="text"
-                  value={formData.locationAddress}
-                  onChange={(e) => setFormData({ ...formData, locationAddress: e.target.value })}
-                  placeholder="e.g. Central Warehouse or Shelter XYZ" maxLength={300}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
-                />
-              </div>
+
 
               <div className="flex items-center justify-end gap-3 pt-3">
                 <Button type="button" disabled={submitting} variant="ghost" onClick={() => setShowCreateModal(false)}>Cancel</Button>
@@ -460,7 +458,7 @@ export default function ResourcesPage() {
 
       {/* Modal: Allocate Resource */}
       {showAllocateModal && (
-        <Modal isOpen={Boolean(showAllocateModal)} onClose={() => setShowAllocateModal(null)} title="Allocate resource" busy={submitting}>
+        <Modal isOpen={Boolean(showAllocateModal)} onClose={() => setShowAllocateModal(null)} title="Reserve resource" busy={submitting}>
 
             <p className="text-xs text-slate-400">
               Available Inventory: <strong className="text-emerald-400 font-mono">{showAllocateModal.availableQuantity} {showAllocateModal.unit}</strong>
@@ -503,7 +501,7 @@ export default function ResourcesPage() {
                   type="text"
                   value={allocateData.notes}
                   onChange={(e) => setAllocateData({ ...allocateData, notes: e.target.value })}
-                  placeholder="e.g. Dispatched with Response Team Alpha"
+                  placeholder="Purpose of this reservation"
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
                 />
               </div>
@@ -511,7 +509,7 @@ export default function ResourcesPage() {
               <div className="flex items-center justify-end gap-3 pt-3">
                 <Button type="button" disabled={submitting} variant="ghost" onClick={() => setShowAllocateModal(null)}>Cancel</Button>
                 <Button type="submit" disabled={submitting} className="bg-orange-500 hover:bg-orange-600">
-                  {submitting ? 'Allocating…' : 'Dispatch Allocation'}
+                  {submitting ? 'Allocating…' : 'Reserve for incident'}
                 </Button>
               </div>
             </form>
@@ -556,7 +554,7 @@ export default function ResourcesPage() {
                     onChange={(e) => setEditData({ ...editData, status: e.target.value })}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
                   >
-                    <option value="AVAILABLE">Automatic from stock</option>
+                    <option value="AVAILABLE">Available</option>
                     <option value="MAINTENANCE">Maintenance</option>
                   </select>
                 </div>

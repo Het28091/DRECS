@@ -241,6 +241,8 @@ export interface ResourceAllocation {
 }
 
 export interface Resource {
+  storageId?: string;
+  shelterReserved?: number;
   id: string;
   name: string;
   category: string;
@@ -284,9 +286,12 @@ export interface NotificationsResponse {
   notifications: Notification[];
 }
 
-export type VolunteerRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type VolunteerRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
 
 export interface VolunteerRequest {
+  availability?: string;
+  incidentStatus?: string;
+  incidentApproval?: string;
   canApprove?: boolean;
   id: string;
   userId: IncidentReporter | string;
@@ -303,6 +308,7 @@ export interface VolunteerRequest {
 }
 
 export interface CreateVolunteerRequestData {
+  availability?: string;
   skills: string[];
   experience: string;
   message: string;

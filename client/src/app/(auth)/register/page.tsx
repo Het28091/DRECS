@@ -71,7 +71,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="bg-slate-800/90 border border-slate-700 rounded-2xl p-5 sm:p-8 shadow-2xl max-w-md mx-auto">
+    <div className="">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white mb-1 flex items-center gap-2">
           <ShieldCheck className="text-orange-500" size={24} /> Create Account
@@ -88,7 +88,7 @@ export default function RegisterPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form method="post" onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="name" className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
             Full Name

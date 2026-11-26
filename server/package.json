@@ -1,7 +1,7 @@
 {
   "name": "drecs-server",
   "version": "1.0.0",
-  "description": "DRECS — Disaster Response & Emergency Coordination System — Backend",
+  "description": "DRECS \u2014 Disaster Response & Emergency Coordination System \u2014 Backend",
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon",
@@ -9,7 +9,7 @@
     "start": "node dist/index.js",
     "clean": "rimraf dist",
     "test": "node -r ts-node/register/transpile-only --test tests/*.test.ts",
-    "test:integration": "node -r ts-node/register/transpile-only --test tests/logistics.integration.ts"
+    "test:integration": "node -r ts-node/register/transpile-only --test tests/*.integration.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

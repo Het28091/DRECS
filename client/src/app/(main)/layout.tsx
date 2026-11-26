@@ -5,13 +5,13 @@ import { AuthGuard } from '@/components/layout/AuthGuard';
 
 export const metadata: Metadata = {
   title: {
-    template: '%s | DRECS Console',
-    default: 'DRECS Tactical Operational Console',
+    template: '%s | DRECS',
+    default: 'DRECS | Disaster Coordination',
   },
 };
 
 /**
- * Main application layout — wraps all authenticated pages in Tactical Dark Utility theme.
+ * Main application layout — wraps all authenticated pages in shared application shell.
  */
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (

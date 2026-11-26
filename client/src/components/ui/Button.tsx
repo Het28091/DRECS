@@ -25,9 +25,9 @@ const variants: Record<Variant, string> = {
 };
 
 const sizes: Record<Size, string> = {
-  sm: 'px-2.5 py-1 text-xs gap-1.5',
-  md: 'px-3.5 py-1.5 text-xs gap-1.5',
-  lg: 'px-4 py-2 text-sm gap-2',
+  sm: 'px-3 py-2 text-xs gap-1.5',
+  md: 'px-4 py-2.5 text-sm gap-2',
+  lg: 'px-5 py-3 text-sm gap-2',
 };
 
 export function Button({
@@ -43,7 +43,7 @@ export function Button({
   return (
     <button type={type} aria-busy={loading || undefined}
       className={cn(
-        'inline-flex min-h-9 shrink-0 items-center justify-center self-start rounded-md transition-colors',
+        'inline-flex min-h-10 shrink-0 items-center justify-center self-start rounded-xl transition-colors',
         'focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-slate-950',
         'disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-400 disabled:border-slate-700 disabled:shadow-none',
         variants[variant],

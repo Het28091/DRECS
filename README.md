@@ -1,92 +1,110 @@
 # DRECS — Disaster Response & Emergency Coordination System
 
-DRECS coordinates incident reports, authority review, volunteer response, shelters, resources, and notifications.
+DRECS brings incident reporting, volunteer coordination, shelter management, inventory and supply delivery into one application. It is an English-language college demonstration designed to run locally with sample data and internet access.
 
-## Architecture
+Management decisions remain separate from volunteer availability and physical stock movements. The application supports coordination; it does not dispatch emergency services or verify conditions in the field.
 
-- **Client:** Next.js 14 App Router, React, TypeScript, Tailwind, Leaflet, and Recharts. Pages live in client/src/app; API wrappers in client/src/lib; authentication and socket connections are shared providers.
-- **API:** Express and TypeScript. Routes authenticate JWTs against the current user record, apply role guards and body validation, and call controllers.
-- **Persistence:** MongoDB with Mongoose models for users, incidents, volunteer requests, assignments, shelters, resources, and notifications.
-- **Live updates:** Authenticated Socket.IO connections receive their own notifications and data invalidation events. Pages re-fetch through their authorized API on changes, reconnect, focus, and every 30 seconds while visible. Form drafts remain in place.
+## Capabilities
 
-## Incident workflow
+- **Incident reporting:** location-based reports, management verification, response status and decision history.
+- **Help offers:** immediate sharing of availability and contact details, owner updates and withdrawal, private coordination with management.
+- **Shelters:** capacity and occupancy management, validated contacts, map selection, place search and device location.
+- **Inventory and supplies:** source stock, shelter requests, source suggestions, dispatch, partial receipt, returns, damage and usage records.
+- **Disaster assistant:** Gemini-generated guidance and website help, with concise answers and server-side instructions.
+- **Administration:** role-based access, account management, notifications and analytics.
 
-1. A citizen or volunteer submits a title, description, category, severity, and a point selected on the map. Browser location is an optional explicit action. Coordinate inputs are not exposed in the report form.
-2. The report starts with approvalStatus=PENDING and response status REPORTED. Only its reporter and authority/admin users can inspect it. Public listings, map markers, and community statistics require explicit approval.
-3. An authority opens the report from Dashboard and selects **Approve report** or **Reject report**. The decision is recorded in the timeline and sent to the reporter as a notification. Approval makes the report public and normally moves it to UNDER_REVIEW. Rejection leaves it private.
-4. Approved active incidents accept volunteer offers. Skills, experience, an explanation of help, and a reachable phone number are required. A user may have only one pending/approved offer per incident; rejected users can reapply.
-5. Authority approval of a volunteer offer creates an assignment and moves an incident awaiting responders to ASSIGNED. These writes run together in a MongoDB transaction.
-6. The responder moves their task through ASSIGNED → ACCEPTED → IN_PROGRESS → COMPLETED. Starting a task moves an ASSIGNED incident to IN_PROGRESS. Completing a task does not resolve the incident; the authority decides that.
-7. Authorities can resolve an approved incident only after all assignments are completed or removed. RESOLVED can move to CLOSED; CLOSED is terminal. No new offers, assignments, or resource allocations are accepted for terminal incidents.
+## Documentation
 
-The incident response transitions are centralized in server/src/utils/incidentPolicy.ts. Authority forms show the permitted next states. Authorities can also begin response or resolve an incident without volunteer assignments, for example when their own team handles it. Removing the last pending assignment returns an ASSIGNED incident to UNDER_REVIEW; completed task history is retained.
+| Document | Contents |
+| --- | --- |
+| [Architecture and technology](PROJECT_INFORMATION.md) | Components, tools, data model, techniques and design rationale |
+| [System workflows](docs/WORKFLOWS.md) | Incident decisions, help offers, locations and stock-accounting rules |
+| [API reference](docs/API.md) | Endpoint groups, access rules and request examples |
+| [Validation and security](docs/SECURITY.md) | Implemented controls, privacy boundaries and remaining limitations |
+| [Demonstration and verification](EVALUATOR_GUIDE.md) | Local setup, sample accounts, demonstration scenarios and tests |
+| [Source guide](FUNCTION_INVENTORY.md) | Entry points for understanding and modifying each system |
+| [UI review](UI_REVIEW.md) | Interface conventions and verified review scope |
 
-**No AI is used in reporting.** The submitted severity is preserved. The OpenAI dependency and verification utilities have been removed. Text length, sanitization, field validation, daily limits, and authority review remain.
+## Technology
 
-## Daily spam prevention
+Next.js 14 · React 18 · TypeScript · Tailwind CSS · Express 4 · MongoDB · Mongoose 8 · Zod · JWT · bcryptjs · Socket.IO · Leaflet · OpenStreetMap/Nominatim · Recharts · Google Gemini
 
-Each user can submit **5 incident reports per calendar day**, resetting at **00:00 Asia/Kolkata (UTC+05:30)**. An atomic per-user reservation enforces the limit across concurrent submissions and application instances. Existing reports created earlier that day also count. Failed report persistence releases the reservation. The API returns HTTP 429 when the limit is reached.
+Dependency versions are defined in the client/server manifests and pinned by their respective lockfiles. See the architecture document for each tool's purpose.
 
-## Screens and state rules
+## Quick start
 
-- **Dashboard** contains incident lists, status/category/severity filters, and authority approval filters. The previous /incidents and /incidents/my list routes redirect here.
-- **Shelters:** Cards are read-only. Click Edit, change the form, then Save Changes or Cancel. ACTIVE/FULL follow occupancy automatically; INACTIVE is preserved. Occupancy cannot exceed capacity.
-- **Resources:** Availability determines AVAILABLE, LOW_STOCK (below 20%), or DEPLETED. MAINTENANCE is retained and blocks allocations. Allocation details are authority-only.
-- **Shelter Supplies:** Authority/admin storage links, explicit demand, distance-sorted stock suggestions, reservation → dispatch → receipt, consumption ledger and optional read-only contextual assistant. See Project Information for accounting rules and limits.
-- **Volunteer Force:** Summary counts, search by responder/email/incident, task status filtering, incident links, status badges, and assignment removal controls.
-- **Notifications:** The navbar bell displays an unread count and recent messages. New notifications appear as dismissible popups. Opening one marks it read; the Notifications page retains history.
-- **Sidebar:** The separate Incidents item and bottom footer text have been removed.
+Requirements: Node.js 20.19 or later, npm, internet access, and a MongoDB replica set. Multi-document transactions will not work with a standalone MongoDB instance.
 
-## Setup
+Install dependencies in separate terminals:
 
-Install dependencies in both directories using npm install. Use Node.js 20.19+ and a MongoDB replica set or Atlas deployment (transactions are required for volunteer approvals and supply movements).
-
-Create server/.env with your own values:
-
-```env
-PORT=5000
-NODE_ENV=development
-MONGODB_URI=mongodb://127.0.0.1:27017/drecs?replicaSet=rs0
-JWT_SECRET=replace-with-a-strong-secret
-CLIENT_URL=http://localhost:3000
-# Optional contextual assistant (server-only; reporting does not use AI):
-OPENAI_API_KEY=
-OPENAI_MODEL=
+```powershell
+cd server
+npm ci
+Copy-Item .env.example .env
 ```
 
-Create client/.env.local:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:5000/api
-NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
+```powershell
+cd client
+npm ci
+Copy-Item .env.example .env.local
 ```
 
-Run npm run dev in server and client, then visit http://localhost:3000.
+Copy environment templates only on a fresh checkout; preserve existing environment files. Set `MONGODB_URI` and a strong `JWT_SECRET` in `server/.env`. Add `GEMINI_API_KEY` to enable the assistant. Never put that key in a `NEXT_PUBLIC_` variable.
 
-## Existing data
+Start the API and client in their respective terminals:
 
-Reports without an approval field are treated as pending; they are intentionally hidden from the community until an authority reviews them. Historical AI fields may remain in stored documents but are no longer used or returned. No existing database records are automatically approved or deleted.
+```powershell
+npm run dev
+```
 
-A partial unique index named active_offer_per_incident prevents simultaneous duplicate pending/approved volunteer offers. Before deploying onto an existing database, check for duplicate active offers for each incident/user and reconcile them before building this index. Mongoose creates the index when automatic indexing is enabled; deployments with autoIndex disabled must apply model indexes through their normal migration process. Do not blindly drop existing indexes or delete request history.
+Open [localhost:3000](http://localhost:3000). The API runs at `http://localhost:5000/api`; its health endpoint is `http://localhost:5000/health`. Restart the API after editing server environment settings.
+
+For a demonstration without configuring MongoDB, use the [disposable preview](EVALUATOR_GUIDE.md#disposable-demonstration). Public registration creates citizen accounts; it cannot create administrators. The preview includes management accounts.
+
+## Configuration
+
+| Variable | Location | Purpose |
+| --- | --- | --- |
+| `MONGODB_URI` | Server | Replica-set database connection |
+| `JWT_SECRET` | Server | Signing secret; required |
+| `JWT_EXPIRES_IN` | Server | Token lifetime, default `7d` |
+| `PORT` | Server | API port, default `5000` |
+| `CLIENT_URL` | Server | Allowed browser origin, default `http://localhost:3000` |
+| `GEMINI_API_KEY` | Server | Google AI Studio credential; optional until chat is used |
+| `GEMINI_MODEL` | Server | Default `gemini-3.1-flash-lite` |
+| `GEOCODER_URL` | Server | Optional Nominatim-compatible base URL |
+| `NEXT_PUBLIC_API_URL` | Client | Browser API base URL |
+| `NEXT_PUBLIC_SOCKET_URL` | Client | Socket.IO server URL |
+
+Maps do not require an API key. Device location needs browser permission; internet access is required for map tiles, search and AI. Gemini availability and quotas depend on the Google account and selected model. Consult [Google's model documentation](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-flash-lite) and the [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/).
 
 ## Verification
 
-- server: npm test runs workflow/controller tests with mocked persistence and a real local Socket.IO authentication test. Both client and server dependencies must be installed for the socket client test.
-- server: npm run test:integration runs transaction, conservation, rollback and concurrency tests against a disposable MongoDB replica set; first run downloads the MongoDB binary.
-- server: npm run build compiles the API.
-- client: npm run build validates types and creates the production build.
-- Optional UI preview: run node tests/ui-preview.cjs from server with the client on port 3000. This loopback-only fixture API uses in-memory sample data and never connects to MongoDB. Sign in using authority@example.test or citizen@example.test and any nonempty password. Stop it before starting the real API; it uses port 5000.
+```powershell
+# In server
+npm test
+npm run test:integration
+npm run build
 
-For a real-API UI preview, run node tests/logistics-preview.cjs from server with the production client on port 3000. This starts a disposable MongoDB replica set on a random database port, binds the API to loopback port 5000 and disables external AI calls. Sign in with authority@example.test or citizen@example.test and Preview123!. Type stop to clean up; it also stops after 30 minutes. Never use these fixture credentials in production.
+# In client
+npm run build
+```
 
-Controller tests do not replace integration testing against a disposable MongoDB replica set, especially for transactions, unique-index migration, and concurrent quota enforcement. The UI fixture validates screen behavior only, not backend authorization.
+The latest verification passed 44 unit tests, 25 integration tests and both production builds. Integration tests use disposable MongoDB replica sets. Live Gemini requests succeeded; one browser request timed out and correctly displayed retry feedback. This is a local demonstration, not a production-readiness certification.
 
-## Project reference
+## Repository layout
 
-See [Project Information](PROJECT_INFORMATION.md) for validation expressions, status effects, resource troubleshooting, and the implemented shelter supply workflow, optional AI configuration, and remaining roadmap.
+```text
+client/src/app/          Routes and page layouts
+client/src/components/   Shared interface and workflow components
+client/src/lib/          API clients and frontend helpers
+server/src/routes/      HTTP endpoints and access middleware
+server/src/controllers/ Business operations
+server/src/models/      MongoDB documents and indexes
+server/src/utils/       Validation, policies and AI integration
+server/src/socket/      Authenticated notifications and refresh events
+server/tests/           Unit tests, integration tests and preview fixtures
+docs/                   Workflow, API and security documentation
+```
 
-## Evaluator preparation and UI review — 8 October 2026
-
-See [Evaluator Guide](EVALUATOR_GUIDE.md) for requirements, architecture, feature purpose/working/pending status, data models, API roles, algorithms, engineering challenges, demo sequence and viva questions. [Function Inventory](FUNCTION_INVENTORY.md) indexes named source functions with file/line and call traces. [UI Review](UI_REVIEW.md) records the review scope and verification limits.
-
-Supply forms now use aligned action controls, prerequisite guidance and an optional existing-item selector. Unconfigured AI fields are disabled with a non-AI alternative. The map removes cleared selections. Inventory analytics displays lot counts instead of summing incompatible units, and charts expose readable data tables. Existing quantity aggregates in the API remain legacy values and must not be interpreted as a total physical supply across units.
+Environment files, dependencies and build output are excluded from Git. Existing assignment history is retained read-only; new help offers do not create assignments. Current behavior is described by the linked documentation rather than the previous prototype workflow.

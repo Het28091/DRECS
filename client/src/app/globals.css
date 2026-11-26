@@ -15,13 +15,31 @@
 
   body {
     @apply bg-slate-950 text-slate-100 font-sans antialiased selection:bg-amber-600 selection:text-white;
+    line-height: 1.6;
   }
 
   * {
     @apply border-slate-800;
   }
 
-  /* Tactical minimal scrollbar */
+  h1, h2, h3 { text-wrap: balance; letter-spacing: -0.025em; }
+  p { overflow-wrap: anywhere; }
+  button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+  input:not([type='checkbox']):not([type='radio']), select, textarea {
+    min-height: 2.75rem;
+    border-radius: 0.65rem;
+    transition: border-color 150ms, box-shadow 150ms;
+  }
+  input::placeholder, textarea::placeholder { color: #94a3b8; }
+  input:disabled, textarea:disabled, select:disabled { opacity: 0.65; cursor: not-allowed; }
+  table th { font-weight: 600; color: #cbd5e1; }
+  table th, table td { padding: 0.875rem 1rem; }
+  table tbody tr { border-bottom: 1px solid #1e293b; }
+  table tbody tr:hover { background: rgb(30 41 59 / 0.35); }
+  summary { padding-block: 0.75rem; font-weight: 500; cursor: pointer; }
+  summary::marker { color: #94a3b8; }
+
+  /* Compact scrollbars retain space for page content. */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -42,7 +60,7 @@
 
 @layer utilities {
   .card-clean {
-    @apply bg-slate-900 border border-slate-800 rounded-md p-4 shadow-sm hover:border-slate-700 transition-all text-slate-100;
+    @apply bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm hover:border-slate-700 transition-colors text-slate-100;
   }
 }
 

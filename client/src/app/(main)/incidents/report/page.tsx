@@ -162,9 +162,9 @@ export default function ReportIncidentPage() {
       <div className="flex items-center gap-3 mb-8">
         <AlertTriangle className="text-orange-400" size={28} />
         <div>
-          <h1 className="text-2xl font-bold text-white">Report Incident</h1>
+          <h1 className="text-2xl font-bold text-white">Report incident</h1>
           <p className="text-slate-400 text-sm">
-            Submit an emergency report for authority review
+            Share the incident details and location.
           </p>
         </div>
       </div>
@@ -172,10 +172,10 @@ export default function ReportIncidentPage() {
       <Card>
         <div className="mb-5 p-3 bg-slate-900/90 rounded-xl border border-slate-700/80 flex items-center gap-2.5 text-xs text-slate-300">
           <span className="p-1 bg-emerald-500/10 text-emerald-400 rounded-lg shrink-0 font-bold flex items-center gap-1">
-            <ShieldCheck size={14} /> Authority approval required
+            <ShieldCheck size={14} /> Management verification
           </span>
           <p className="text-[11px] text-slate-400">
-            Reports become visible to the community only after approval. Limit: 5 reports per day, resetting at midnight India time.
+            Reports are public after verification. Up to 5 reports per day.
           </p>
         </div>
 

@@ -3,8 +3,6 @@ import {
   getMyAssignments,
   getAssignmentsByIncident,
   getMyVolunteerAccess,
-  updateAssignmentStatus,
-  removeAssignment,
 } from '../controllers/assignmentController';
 import { authenticate } from '../middleware/authMiddleware';
 import { roleGuard } from '../middleware/roleGuard';
@@ -33,18 +31,5 @@ router.get(
   getAssignmentsByIncident,
 );
 
-router.patch(
-  '/:id/status',
-  authenticate,
-  validateBody(updateAssignmentStatusSchema),
-  updateAssignmentStatus,
-);
-
-router.delete(
-  '/:id',
-  authenticate,
-  roleGuard('authority', 'admin'),
-  removeAssignment,
-);
-
+// Legacy assignments are retained read-only as historical records.
 export default router;

@@ -58,9 +58,10 @@ export async function fetchIncidentById(id: string): Promise<Incident> {
 export async function updateIncidentStatus(
   id: string,
   status: IncidentStatus,
+  note?: string,
 ): Promise<Incident> {
   const response = await api.patch<IncidentResponse>(`/incidents/${id}/status`, {
-    status,
+    status, note,
   });
   return response.data.incident;
 }

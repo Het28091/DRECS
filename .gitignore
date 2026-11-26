@@ -9,6 +9,7 @@ client/out/
 
 # TypeScript Build Output
 server/dist/
+*.tsbuildinfo
 
 # Environment Variables
 .env
@@ -16,6 +17,8 @@ server/dist/
 *.env.local
 server/.env
 client/.env.local
+.env.*
+!.env.example
 
 # Logs
 npm-debug.log*
@@ -27,3 +30,6 @@ logs/
 .DS_Store
 .vscode/
 .idea/
+
+# Isolated local verification output
+client/.next-*/

@@ -1,3 +1,4 @@
+import coordinationRoutes from './coordinationRoutes';
 import { Router } from 'express';
 import {
   createIncident,
@@ -23,6 +24,7 @@ import {
 } from '../utils/validators';
 
 const router = Router();
+router.use('/:id/coordination', coordinationRoutes);
 
 router.post(
   '/',

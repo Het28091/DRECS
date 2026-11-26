@@ -26,13 +26,13 @@ const severityVariant: Record<
 export function StatusBadge({ status }: { status: IncidentStatus }) {
   return (
     <Badge variant={statusVariant[status] ?? 'default'}>
-      {status.replace(/_/g, ' ')}
+      {status === 'ASSIGNED' ? 'Under review' : status === 'IN_PROGRESS' ? 'Response ongoing' : status.toLowerCase().replace(/_/g, ' ')}
     </Badge>
   );
 }
 
 export function SeverityBadge({ severity }: { severity: IncidentSeverity }) {
   return (
-    <Badge variant={severityVariant[severity] ?? 'default'}>{severity}</Badge>
+    <Badge variant={severityVariant[severity] ?? 'default'}>{severity.toLowerCase()}</Badge>
   );
 }

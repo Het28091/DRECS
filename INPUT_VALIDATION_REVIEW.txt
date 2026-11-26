@@ -1,0 +1,14 @@
+Input Validation Review — 26 November 2026
+
+The current validation and security reference is docs/SECURITY.md.
+Architecture and implementation rationale: PROJECT_INFORMATION.md.
+Business workflow and stock-accounting rules: docs/WORKFLOWS.md.
+Verification commands and coverage: EVALUATOR_GUIDE.md.
+
+Reviewed areas include account inputs, incident reports and response decisions,
+help offers, private coordination, shelter contacts and coordinates, inventory,
+supply movements, administrative mutations, query parameters and AI requests.
+Validation is enforced server-side; text rendering remains the XSS boundary.
+
+Latest verification: 44 unit tests, 25 integration tests and both builds passed.
+This review does not constitute exhaustive security or production certification.

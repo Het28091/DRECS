@@ -116,7 +116,7 @@ export default function NotificationsPage() {
               )}
             </h1>
             <p className="text-slate-400 text-sm mt-0.5">
-              Real-time updates regarding incident dispatches, volunteer approvals, and resource allocations.
+              Updates on incidents, help offers, messages and resources.
             </p>
           </div>
         </div>

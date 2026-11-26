@@ -1,3 +1,5 @@
+import { StorageLocation } from '../models/Logistics';
+import { Resource } from '../models/Resource';
 import { Response } from 'express';
 import { Types } from 'mongoose';
 import { Shelter, SHELTER_STATUSES, IShelterDocument } from '../models/Shelter';
@@ -147,7 +149,18 @@ export const updateShelter = asyncHandler(async (req: AuthRequest, res: Response
     shelter.status = 'ACTIVE';
   }
 
-  await shelter.save();
+  if (location !== undefined && shelter.logisticsLinked) {
+    await Shelter.db.transaction(async session => {
+      await shelter.save({ session });
+      const stores = await StorageLocation.find({ shelterId: shelter._id }).session(session);
+      for (const store of stores) {
+        store.latitude = shelter.location.latitude; store.longitude = shelter.location.longitude;
+        store.address = shelter.location.address || 'Map-selected shelter location';
+        await store.save({ session });
+        await Resource.updateMany({ storageId: store._id }, { $set: { location: { latitude: store.latitude, longitude: store.longitude, address: store.address } } }, { session, runValidators: true });
+      }
+    });
+  } else await shelter.save();
 
   res.status(200).json({
     success: true,

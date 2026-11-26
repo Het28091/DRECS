@@ -1,39 +1,11 @@
 import { Router } from 'express';
-import {
-  getAllVolunteerRequests,
-  getMyVolunteerRequests,
-  reviewVolunteerRequest,
-} from '../controllers/volunteerRequestController';
+import { getAllVolunteerRequests, getMyVolunteerRequests, updateOwnOffer } from '../controllers/volunteerRequestController';
 import { authenticate } from '../middleware/authMiddleware';
 import { roleGuard } from '../middleware/roleGuard';
-import {
-  validateBody,
-  reviewVolunteerRequestSchema,
-} from '../utils/validators';
-
+import { validateBody, updateOfferSchema } from '../utils/validators';
 const router = Router();
-
-// Centralized management for authority/admin (all requests across incidents)
-router.get(
-  '/',
-  authenticate,
-  roleGuard('authority', 'admin'),
-  getAllVolunteerRequests,
-);
-
-// Current user's own requests (citizen)
-router.get(
-  '/my',
-  authenticate,
-  getMyVolunteerRequests,
-);
-
-router.patch(
-  '/:id/status',
-  authenticate,
-  roleGuard('authority', 'admin'),
-  validateBody(reviewVolunteerRequestSchema),
-  reviewVolunteerRequest,
-);
-
+router.use(authenticate);
+router.get('/', roleGuard('authority','admin'), getAllVolunteerRequests);
+router.get('/my', getMyVolunteerRequests);
+router.patch('/:id', validateBody(updateOfferSchema), updateOwnOffer);
 export default router;

@@ -81,7 +81,7 @@ test('logistics routes reject unauthenticated, citizen, volunteer and deactivate
  app.use((e:any,_req:any,res:any,_next:any)=>res.status(e.statusCode||500).json({message:e.message}));
  const server=await new Promise<any>(resolve=>{const listener=app.listen(0,'127.0.0.1',()=>resolve(listener));});
  try {
-  const url='http://127.0.0.1:'+server.address().port+'/logistics/assistant';
+  const url='http://127.0.0.1:'+server.address().port+'/logistics';
   assert.equal((await fetch(url)).status,401);
   for(const role of ['citizen','volunteer','authority','admin']) {
    const account=await User.create({name:'Test account',email:role+'@example.test',password:'Test123!',role});
@@ -94,17 +94,48 @@ test('logistics routes reject unauthenticated, citizen, volunteer and deactivate
  } finally {await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });
 
-test('AI quota is persistent and enforces concurrent interval, daily cap and day reset',async()=>{
- const { askAssistant }=require('../src/controllers/assistantController');
- const { incidentReportDay }=require('../src/utils/incidentPolicy');
- let providerCalls=0;
- mock.method(globalThis,'fetch',async()=>{providerCalls++;return {ok:true,json:async()=>({output:[{type:'message',content:[{type:'output_text',text:'No recorded demand.'}]}]})};});
- const day=incidentReportDay(new Date());
- await AssistantQuota.create({_id:user,day,count:0,lastAt:new Date(0)});
- const results=await Promise.all([run(askAssistant,{question:'Where is demand?'}),run(askAssistant,{question:'Where is demand?'})]);
- assert.deepEqual(results.map(r=>r.status).sort(),[200,429]);assert.equal(providerCalls,1);
- await AssistantQuota.updateOne({_id:user},{count:20,lastAt:new Date(0)});
- assert.equal((await run(askAssistant,{question:'Where is demand?'})).status,429);assert.equal(providerCalls,1);
- await AssistantQuota.updateOne({_id:user},{day:'2000-01-01',lastAt:new Date(0)});
- assert.equal((await run(askAssistant,{question:'Where is demand?'})).status,200);assert.equal((await AssistantQuota.findById(user)).count,1);
+test('shelter location edits synchronize linked storage and resource coordinates',async()=>{
+ const s=await setup();
+ const store=await StorageLocation.create({name:'Shelter store',kind:'SHELTER',shelterId:s.shelter._id,address:'Old address',latitude:22.3,longitude:73.2,createdBy:user});
+ const resource=await Resource.create({name:'Food',category:'Food',unit:'packs',quantity:10,availableQuantity:10,storageId:store._id,logisticsLinked:true});
+ await Shelter.updateOne({_id:s.shelter._id},{$set:{logisticsLinked:true}});
+ const {updateShelter}=require('../src/controllers/shelterController');
+ assert.equal((await run(updateShelter,{location:{latitude:23,longitude:74,address:'New hall'}},String(s.shelter._id))).status,200);
+ assert.equal((await StorageLocation.findById(store._id)).latitude,23);
+ assert.equal((await Resource.findById(resource._id)).location.address,'New hall');
+});
+
+test('send now, partial receipt, actual return and damage preserve every physical unit',async()=>{
+ const s=await setup(100,100), body={...reservation(s,60),sendNow:true};
+ const result=await run(handlers.reserveTransfer,body);assert.equal(result.status,201);const id=String(result.transfer._id);
+ assert.equal(result.transfer.status,'DISPATCHED');assert.equal((await Resource.findById(s.resource._id)).quantity,40);
+ assert.equal((await run(handlers.reserveTransfer,body)).status,201);assert.equal((await Resource.findById(s.resource._id)).quantity,40);
+ const receipt={status:'RECEIVED',quantity:30,requestKey:randomUUID()};
+ assert.equal((await run(handlers.transitionTransfer,receipt,id)).transfer.status,'DISPATCHED');
+ assert.equal((await run(handlers.transitionTransfer,receipt,id)).status,200);assert.equal((await ShelterStock.findOne()).quantity,30);
+ assert.equal((await run(handlers.transitionTransfer,{status:'RETURNED',quantity:20,requestKey:randomUUID(),notes:'Physically back at depot'},id)).status,200);
+ assert.equal((await Resource.findById(s.resource._id)).quantity,60);
+ assert.equal((await run(handlers.transitionTransfer,{status:'DAMAGED',quantity:10,requestKey:randomUUID(),notes:'Broken containers on delivery'},id)).transfer.status,'SETTLED');
+ const need=await ShelterNeed.findById(s.need._id);assert.equal(need.fulfilled,30);assert.equal(need.committed,0);
+ assert.equal((await Resource.findById(s.resource._id)).availableQuantity,60);
+ assert.equal((await ShelterStock.findOne()).quantity+60+10,100);
+ assert.equal((await run(handlers.transitionTransfer,{status:'RECEIVED',quantity:1,requestKey:randomUUID()},id)).status,409);
+});
+test('concurrent partial receipts cannot exceed goods in transit',async()=>{
+ const s=await setup(100,100), result=await run(handlers.reserveTransfer,{...reservation(s,50),sendNow:true});const id=String(result.transfer._id);
+ const results=await Promise.all([run(handlers.transitionTransfer,{status:'RECEIVED',quantity:40,requestKey:randomUUID()},id),run(handlers.transitionTransfer,{status:'RECEIVED',quantity:40,requestKey:randomUUID()},id)]);
+ assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);assert.equal((await ShelterStock.findOne()).quantity,40);
+});
+
+test('retries of a shelter need do not create duplicate demand',async()=>{
+ const s=await setup();const body={shelterId:String(s.shelter._id),item:'Food packs',category:'Food',unit:'packs',requested:25,urgency:'NORMAL',requestKey:randomUUID()};
+ const first=await run(handlers.createNeed,body);const again=await run(handlers.createNeed,body);
+ assert.equal(first.status,201);assert.equal(String(first.need._id),String(again.need._id));
+ assert.equal(await ShelterNeed.countDocuments({item:'Food packs'}),1);
+ assert.equal((await run(handlers.createNeed,{...body,requested:26})).status,409);
+});
+test('new source inventory inherits storage location at creation',async()=>{
+ const s=await setup();const {createResource}=require('../src/controllers/resourceController');
+ const result=await run(createResource,{name:'Food packs',category:'Food',unit:'packs',quantity:50,storageId:String(s.storage._id)});
+ assert.equal(result.status,201);assert.equal(result.resource.storageId,String(s.storage._id));assert.equal(result.resource.location.latitude,s.storage.latitude);
 });
